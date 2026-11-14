@@ -1,0 +1,115 @@
+// api.ts —— 统一路由：pathname → handler（规格 §13）
+import { preflight } from "./_shared/cors.ts";
+import { fail, failErr, readJson, HttpError } from "./_shared/response.ts";
+import { requireUser } from "./_shared/auth.ts";
+import * as auth from "./handlers/auth.ts";
+import * as user from "./handlers/user.ts";
+import * as conversations from "./handlers/conversations.ts";
+import * as messages from "./handlers/messages.ts";
+import type { Ctx } from "./handlers/types.ts";
+
+export default async function api(req: Request): Promise<Response> {
+  try {
+    if (req.method === "OPTIONS") return preflight();
+
+    const url = new URL(req.url);
+    const path = url.pathname.replace(/^\/api\/v1/, "").replace(/\/+$/, "") || "/";
+    const method = req.method.toUpperCase();
+
+    // 无认证路由
+    if (method === "POST" && path === "/auth/signup") {
+      return await auth.signup(await makeCtx(req, url));
+    }
+    if (method === "POST" && path === "/auth/verify") {
+      return await auth.verify(await makeCtx(req, url));
+    }
+    if (method === "POST" && path === "/auth/login") {
+      return await auth.login(await makeCtx(req, url));
+    }
+    if (method === "POST" && path === "/auth/recover") {
+      return await auth.recover(await makeCtx(req, url));
+    }
+
+    // 认证路由（先解析，再路由）
+    if (method === "POST" && path === "/auth/logout") {
+      return await auth.logout(await makeCtx(req, url));
+    }
+
+    await requireUser(req);
+
+    if (method === "GET" && path === "/auth/me") {
+      return await auth.me(await makeCtx(req, url));
+    }
+    if (method === "PATCH" && path === "/user/username") {
+      return await user.updateUsername(await makeCtx(req, url));
+    }
+    if (method === "PATCH" && path === "/user/profile") {
+      return await user.updateProfile(await makeCtx(req, url));
+    }
+
+    const convMatch = path.match(/^\/conversations\/([A-Za-z0-9-]+)(\/.*)?$/);
+
+    if (method === "GET" && path === "/conversations") {
+      return await conversations.listConversations(await makeCtx(req, url));
+    }
+    if (method === "POST" && path === "/conversations/direct") {
+      return await conversations.createDirect(await makeCtx(req, url));
+    }
+    if (method === "POST" && path === "/conversations/group") {
+      return await conversations.createGroup(await makeCtx(req, url));
+    }
+
+    if (convMatch) {
+      const id = convMatch[1];
+      const sub = convMatch[2] ?? "";
+
+      if (method === "GET" && sub === "") {
+        return await conversations.getConversation(await makeCtx(req, url), id);
+      }
+      if (method === "PATCH" && sub === "") {
+        return await conversations.renameConversation(await makeCtx(req, url), id);
+      }
+      if (method === "DELETE" && sub === "") {
+        return await conversations.deleteConversation(await makeCtx(req, url), id);
+      }
+      if (method === "POST" && sub === "/members") {
+        return await conversations.addMember(await makeCtx(req, url), id);
+      }
+      const memberMatch = sub.match(/^\/members\/([A-Za-z0-9-]+)$/);
+      if (method === "DELETE" && memberMatch) {
+        return await conversations.removeMember(await makeCtx(req, url), id, memberMatch[1]);
+      }
+      if (method === "POST" && sub === "/leave") {
+        return await conversations.leaveConversation(await makeCtx(req, url), id);
+      }
+      if (method === "POST" && sub === "/transfer") {
+        return await conversations.transferOwnership(await makeCtx(req, url), id);
+      }
+      if (method === "PATCH" && sub === "/read") {
+        return await conversations.markRead(await makeCtx(req, url), id);
+      }
+      if (method === "POST" && sub === "/messages") {
+        return await messages.sendMessage(await makeCtx(req, url), id);
+      }
+      if (method === "GET" && sub === "/messages") {
+        return await messages.listMessages(await makeCtx(req, url), id);
+      }
+      if (method === "GET" && sub === "/messages/sync") {
+        return await messages.syncMessages(await makeCtx(req, url), id);
+      }
+    }
+
+    return fail("INVALID_INPUT", `no route for ${method} ${path}`, 404);
+  } catch (e) {
+    return failErr(e);
+  }
+}
+
+async function makeCtx(req: Request, url: URL): Promise<Ctx> {
+  const body = methodHasBody(req.method) ? await readJson(req) : {};
+  return { req, body, params: {}, url };
+}
+
+function methodHasBody(method: string): boolean {
+  return ["POST", "PATCH", "PUT", "DELETE"].includes(method.toUpperCase());
+}

@@ -1,0 +1,101 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: deno check（全模块类型检查）
+        run: |
+          cd netlify/edge-functions
+          deno check api.ts
+          for f in _shared/*.ts handlers/*.ts; do deno check "$f"; done
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 冒烟测试（mock Turso/Identity，41 断言）
+        run: deno run -A smoke_test.ts
+
+  live-db:
+    runs-on: ubuntu-latest
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 真库端到端测试（9 断言）
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          cat > live_test.ts <<'EOF'
+          import { get, all, run, transaction } from "/var/minis/workspace/chat-backend/netlify/edge-functions/_shared/db.ts";
+          let pass = 0, fail = 0;
+          const check = (n: string, c: boolean, e?: any) => { c ? pass++ : fail++; console.log(c ? "PASS" : "FAIL", n, c ? "" : JSON.stringify(e)); };
+          await run("DELETE FROM messages WHERE sender_id LIKE 'it-%'").catch(()=>{});
+          await run("DELETE FROM conversation_members WHERE user_id LIKE 'it-%'").catch(()=>{});
+          await run("DELETE FROM conversations WHERE created_by LIKE 'it-%'").catch(()=>{});
+          await run("DELETE FROM users WHERE id LIKE 'it-%'").catch(()=>{});
+          await run("DELETE FROM sessions WHERE user_id LIKE 'it-%'").catch(()=>{});
+          await run("INSERT INTO users (id, username, email, created_at) VALUES ('it-u1','ittest1','it1@t.com','2026-01-01')");
+          await run("INSERT INTO users (id, username, email, created_at) VALUES ('it-u2','ittest2','it2@t.com','2026-01-01')");
+          check("run insert x2", true);
+          const u = await get("SELECT id, username, email FROM users WHERE id=?", ["it-u1"]);
+          check("get 参数化查询", u?.username === "ittest1", u);
+          const allU = await all("SELECT id, username FROM users WHERE id LIKE ?", ["it-%"]);
+          check("all 返回 2 行", allU.length === 2, allU);
+          let dupErr = false;
+          try { await run("INSERT INTO users (id, username, email, created_at) VALUES ('it-u3','ittest1','x@t.com','2026-01-01')"); }
+          catch { dupErr = true; }
+          check("unique 冲突抛错", dupErr);
+          try {
+            await transaction("write", async (tx) => {
+              await tx.run("INSERT INTO conversations (id,type,name,created_by,created_at,updated_at) VALUES ('it-c1','group','tx','it-u1','2026-01-01','2026-01-01')");
+              throw new Error("rollback");
+            });
+          } catch {}
+          const gone = await get("SELECT id FROM conversations WHERE id='it-c1'");
+          check("事务异常回滚", gone === null, gone);
+          await transaction("write", async (tx) => {
+            await tx.run("INSERT INTO conversations (id,type,name,created_by,created_at,updated_at) VALUES ('it-c2','direct',NULL,'it-u1','2026-01-01','2026-01-01')");
+            await tx.run("INSERT INTO conversation_members (conversation_id,user_id,role,joined_at) VALUES ('it-c2','it-u1','member','2026-01-01')");
+            await tx.run("INSERT INTO conversation_members (conversation_id,user_id,role,joined_at) VALUES ('it-c2','it-u2','member','2026-01-01')");
+          });
+          const cnt = await get("SELECT COUNT(*) AS n FROM conversation_members WHERE conversation_id='it-c2'");
+          check("事务提交 + COUNT", Number(cnt?.n) === 2, cnt);
+          await run("INSERT INTO messages (id,conversation_id,sender_id,content,created_at) VALUES ('it-m1','it-c2','it-u1','hello','2026-01-02T00:00:00Z')");
+          const c2 = await get("SELECT COUNT(*) AS n FROM messages WHERE conversation_id='it-c2'");
+          check("integer 解码为 number", typeof c2?.n === "number" && c2.n === 1, c2);
+          for (let i = 0; i < 5; i++) {
+            await run("INSERT INTO messages (id,conversation_id,sender_id,content,created_at) VALUES (?,?,?,?,?)",
+              [`it-m${i+2}`, 'it-c2', 'it-u1', `m${i}`, `2026-01-03T00:00:0${i}Z`]);
+          }
+          const page = await all(
+            "SELECT id,content,created_at FROM messages WHERE conversation_id=? AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT 3",
+            ['it-c2', '9999-12-31T23:59:59Z', '\uffff']);
+          check("游标分页 DESC 取 3 条", page.length === 3 && page[0].content === "m4", page.map(p=>p.content));
+          await run("DELETE FROM messages WHERE conversation_id LIKE 'it-%'");
+          await run("DELETE FROM conversation_members WHERE conversation_id LIKE 'it-%'");
+          await run("DELETE FROM conversations WHERE id LIKE 'it-%'");
+          await run("DELETE FROM users WHERE id LIKE 'it-%'");
+          check("清理完成", (await get("SELECT COUNT(*) AS n FROM users WHERE id LIKE 'it-%'"))?.n === 0);
+          console.log(`\n${pass} passed, ${fail} failed`);
+          Deno.exit(fail ? 1 : 0);
+          EOF
+          # 修正 import 路径（CI 环境仓库根目录）
+          sed -i 's|/var/minis/workspace/chat-backend/netlify/edge-functions/_shared/db.ts|./netlify/edge-functions/_shared/db.ts|' live_test.ts
+          deno run -A live_test.ts
