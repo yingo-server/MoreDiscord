@@ -24,6 +24,7 @@ Base URL：`/api/v1`（同站点相对路径）
 | USERNAME_TAKEN | 409 | 用户名冲突 |
 | EMAIL_EXISTS | 409 | 邮箱已注册 |
 | ALREADY_MEMBER | 409 | 目标已在会话 |
+| TRANSLATION_UNAVAILABLE | 502 | 翻译上游不可用 |
 
 ---
 
@@ -185,6 +186,17 @@ Base URL：`/api/v1`（同站点相对路径）
 ---
 
 ## 消息
+
+### POST /translate — 翻译一条消息
+请求：
+```json
+{ "text": "原文（≤4000 码点）", "target_lang": "zh" | "en" }
+```
+响应：
+```json
+{ "data": { "translation": "译文", "target_lang": "zh" }, "error": null }
+```
+说明：需认证；由服务端代理上游，不入库、不改原消息。上游不可用返回 `TRANSLATION_UNAVAILABLE`(502)。
 
 ### POST /conversations/:id/messages — 发送（成员）
 请求：`{ "content": "文本，trim 后非空且 ≤4000 字符" }`

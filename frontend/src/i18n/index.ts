@@ -111,6 +111,9 @@ const EN: Record<string, string> = {
   "input.send": "Send message",
   "input.tooLong": "Message too long (max {n} characters)",
   "input.sendFailed": "Message failed to send",
+  "msg.translate": "Translate",
+  "msg.translating": "…",
+  "msg.translateFailed": "Failed",
 
   // rooms
   "room.directFallback": "Direct Message",
@@ -247,6 +250,9 @@ const ZH: Record<string, string> = {
   "input.send": "发送消息",
   "input.tooLong": "消息过长（最多 {n} 个字符）",
   "input.sendFailed": "消息发送失败",
+  "msg.translate": "翻译",
+  "msg.translating": "…",
+  "msg.translateFailed": "翻译失败",
 
   "room.directFallback": "私聊",
   "room.create.title": "新会话",

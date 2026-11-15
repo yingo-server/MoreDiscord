@@ -39,6 +39,8 @@ export const ROUTES: RouteDef[] = [
   { method: "POST", pattern: "/conversations/([A-Za-z0-9-]+)/messages", auth: true, handler: "sendMessage", arg: "id" },
   { method: "GET", pattern: "/conversations/([A-Za-z0-9-]+)/messages", auth: true, handler: "listMessages", arg: "id" },
   { method: "GET", pattern: "/conversations/([A-Za-z0-9-]+)/messages/sync", auth: true, handler: "syncMessages", arg: "id" },
+  // 消息翻译
+  { method: "POST", pattern: "/translate", auth: true, handler: "translate" },
   // 管理
   { method: "GET", pattern: "/admin/stats/overview", auth: true, admin: true, handler: "adminStats" },
   { method: "GET", pattern: "/admin/users", auth: true, admin: true, handler: "adminListUsers" },

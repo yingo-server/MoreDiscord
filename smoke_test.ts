@@ -486,6 +486,12 @@ console.log("== read ==");
 const rRead = await call("PATCH", `/conversations/${convId}/read`, { token: aliceTok2 });
 check("标记已读", rRead.status === 200, rRead.json);
 
+console.log("== translate ==");
+const rTrBad = await call("POST", "/translate", { token: aliceTok2, body: {} });
+check("翻译缺字段 → 400", rTrBad.status === 400 && rTrBad.json?.error?.code === "INVALID_INPUT", rTrBad.json);
+const rTrLang = await call("POST", "/translate", { token: aliceTok2, body: { text: "hi", target_lang: "xx" } });
+check("非法目标语言 → 400", rTrLang.status === 400 && rTrLang.json?.error?.code === "INVALID_INPUT", rTrLang.json);
+
 console.log("== CORS ==");
 const corsRes = await call("GET", "/auth/me", { token: "sess_bad" });
 check("错误响应也有 CORS 头（经 withCors）", true); // 结构上统一走 withCors

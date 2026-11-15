@@ -3,4 +3,5 @@ export * from "./auth.ts";
 export * from "./user.ts";
 export * from "./conversations.ts";
 export * from "./messages.ts";
+export * from "./translate.ts";
 export * from "./admin.ts";
