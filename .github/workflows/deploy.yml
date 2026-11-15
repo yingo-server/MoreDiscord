@@ -43,7 +43,7 @@ jobs:
           npm ci
           npx tsc -b
       - name: 语言判定单测
-        run: deno test tool/lang.test.ts
+        run: deno test tool/lang.test.ts tool/message_button.test.ts
 
   smoke:
     runs-on: ubuntu-latest
