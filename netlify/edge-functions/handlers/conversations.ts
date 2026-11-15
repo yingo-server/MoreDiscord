@@ -55,7 +55,7 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
        WHERE cm.conversation_id=?`,
       [r.id],
     );
-    let peer = r.type === "direct" ? computePeer(members, userId) : null;
+    let peer: Record<string, any> | null = r.type === "direct" ? computePeer(members, userId) : null;
     if (peer) {
       const full = await dbGet(
         "SELECT id, username, display_name, created_at FROM users WHERE id=?",
@@ -75,7 +75,7 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
       last_at: r.last_at,
       last_read_at: r.last_read_at,
       unread_count: Number(r.unread_count ?? 0),
-      peer: r.type === "direct" ? computePeer(members, userId) : null,
+      peer,
     });
   }
   return ok(out);
