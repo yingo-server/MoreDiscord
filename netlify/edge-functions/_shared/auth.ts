@@ -28,12 +28,20 @@ interface IdentityTokens {
 }
 
 async function identityFetch(path: string, body: unknown): Promise<any> {
+  // /token 端点要求 application/x-www-form-urlencoded（GoTrue 规范），其余端点用 JSON
+  const isToken = path === "/token";
+  const headers: Record<string, string> = isToken
+    ? { "Content-Type": "application/x-www-form-urlencoded" }
+    : { "Content-Type": "application/json" };
+  const payload = isToken
+    ? new URLSearchParams(body as Record<string, string>).toString()
+    : JSON.stringify(body);
   let res: Response;
   try {
     res = await fetch(`${IDENTITY_ORIGIN}/.netlify/identity${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers,
+      body: payload,
     });
   } catch {
     throw new HttpError("INTERNAL_ERROR", "identity unreachable");
@@ -46,13 +54,11 @@ async function identityFetch(path: string, body: unknown): Promise<any> {
 // GoTrue {"code":422,"msg":"..."} 或 {"error":"invalid_grant","error_description":"..."} → 网关错误码；禁止透传
 function mapIdentityError(json: any, status: number): HttpError {
   const msg = String(json?.msg ?? json?.error_description ?? json?.error ?? json?.message ?? "").toLowerCase();
-  if (msg.includes("already registered") || msg.includes("email exists") || msg.includes("user already exists")) {
-    return new HttpError("EMAIL_EXISTS", "email already registered");
+  if (msg.includes("unsupported_grant_type")) {
+    // GoTrue /token 要求 application/x-www-form-urlencoded，JSON 会被拒——这是网关侧的错
+    return new HttpError("INTERNAL_ERROR", "identity token encoding error");
   }
-  if (msg.includes("password") && (msg.includes("short") || msg.includes("weak") || msg.includes("at least"))) {
-    return new HttpError("INVALID_INPUT", "password does not meet requirements");
-  }
-  if (msg.includes("invalid email or password") || msg.includes("no user found") || msg.includes("invalid credentials") || msg.includes("grant_type") && msg.includes("password") && status === 400) {
+  if (msg.includes("invalid_grant") || msg.includes("invalid email or password") || msg.includes("no user found") || msg.includes("invalid credentials")) {
     return new HttpError("INVALID_CREDENTIALS", "invalid email or password");
   }
   if (msg.includes("confirm") || msg.includes("not confirmed")) {
