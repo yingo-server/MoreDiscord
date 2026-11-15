@@ -1,5 +1,5 @@
 // _shared/auth.ts —— 唯一接触 Netlify Identity（GoTrue）的模块（规格 §5）
-import { get as dbGet, run as dbRun, transaction } from "./db.ts";
+import { get as dbGet, run as dbRun, getAndRun, transaction } from "./db.ts";
 import { HttpError } from "./response.ts";
 import { nowIso, nowSec } from "./validate.ts";
 
@@ -126,7 +126,17 @@ export async function resolveUserId(req: Request): Promise<string | null> {
   const raw = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!raw || !raw.startsWith("sess_")) return null;
   const tokenHash = await sha256Hex(raw);
-  const s = await dbGet("SELECT * FROM sessions WHERE token_hash=? AND revoked=0", [tokenHash]);
+  const now = nowIso();
+  const staleBefore = new Date(Date.now() - 60_000).toISOString();
+
+  // 一次 Turso pipeline 往返：SELECT 鉴权 + 条件 UPDATE 最后在线（60s 节流）。
+  // 不新增请求、不新增定时器；每个已认证请求（含收消息轮询）顺带写一次。
+  const s = await getAndRun(
+    "SELECT * FROM sessions WHERE token_hash=? AND revoked=0",
+    [tokenHash],
+    "UPDATE sessions SET last_used_at=? WHERE token_hash=? AND revoked=0 AND last_used_at < ?",
+    [now, tokenHash, staleBefore],
+  );
   if (!s) return null;
   if (Number(s.identity_expires_at) > nowSec()) return s.user_id as string;
 

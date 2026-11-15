@@ -38,6 +38,24 @@ export default async function api(req: Request): Promise<Response> {
       return await auth.logout(await makeCtx(req, url));
     }
 
+    // 路由存在性预检：不存在的路径直接 404，避免先鉴权返回误导性的 401
+    const convPreMatch = path.match(/^\/conversations\/([A-Za-z0-9-]+)(\/.*)?$/);
+    const known =
+      (["GET", "PATCH", "DELETE"].includes(method) && path === "/") ||
+      (method === "GET" && path === "/auth/me") ||
+      (method === "PATCH" && (path === "/user/username" || path === "/user/profile")) ||
+      (method === "GET" && path === "/conversations") ||
+      (method === "POST" && (path === "/conversations/direct" || path === "/conversations/group")) ||
+      (convPreMatch && methodAllowed(method, convPreMatch[2] ?? "")) ||
+      (path.startsWith("/admin/") && (
+        (method === "GET" && ["/admin/users", "/admin/channels", "/admin/audit-log", "/admin/stats/overview"].includes(path)) ||
+        (method === "GET" && /^\/admin\/users\/[A-Za-z0-9-]+$/.test(path)) ||
+        (method === "PATCH" && /^\/admin\/users\/[A-Za-z0-9-]+$/.test(path)) ||
+        (method === "DELETE" && /^\/admin\/channels\/[A-Za-z0-9-]+$/.test(path)) ||
+        (method === "GET" && /^\/admin\/channels\/[A-Za-z0-9-]+\/messages$/.test(path))
+      ));
+    if (!known) return fail("INVALID_INPUT", `no route for ${method} ${path}`, 404);
+
     await requireUser(req);
 
     if (method === "GET" && path === "/auth/me") {
@@ -115,6 +133,17 @@ async function makeCtx(req: Request, url: URL): Promise<Ctx> {
 
 function methodHasBody(method: string): boolean {
   return ["POST", "PATCH", "PUT", "DELETE"].includes(method.toUpperCase());
+}
+
+function methodAllowed(method: string, sub: string): boolean {
+  if (sub === "") return method === "GET" || method === "PATCH" || method === "DELETE";
+  if (sub === "/members") return method === "POST";
+  if (/^\/members\/[A-Za-z0-9-]+$/.test(sub)) return method === "DELETE";
+  if (["/leave", "/transfer"].includes(sub)) return method === "POST";
+  if (sub === "/read") return method === "PATCH";
+  if (sub === "/messages") return method === "POST" || method === "GET";
+  if (sub === "/messages/sync") return method === "GET";
+  return false;
 }
 
 // 代码内路由声明：即使 netlify.toml 未生效也能挂上路由（官方推荐的双保险）

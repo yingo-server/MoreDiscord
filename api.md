@@ -87,7 +87,7 @@ Base URL：`/api/v1`（同站点相对路径）
 ### GET /auth/me — 当前用户
 响应：
 ```json
-{ "data": { "id": "uuid", "username": "alice", "display_name": "Alice", "email": "a@b.c" }, "error": null }
+{ "data": { "id": "uuid", "username": "alice", "display_name": "Alice", "email": "a@b.c", "tag": 1 }, "error": null }
 ```
 
 ---
@@ -108,6 +108,15 @@ Base URL：`/api/v1`（同站点相对路径）
 
 ## 会话
 
+| 项目 | 结果 |
+|---|---|
+| `GET /conversations` | `peer` 附带 `last_seen_at`（ISO 或 null）与 `online`（2 分钟窗口布尔） |
+| `GET /conversations/:id` | `members[]` 每项附带 `last_seen_at` / `online` |
+| `GET /auth/me` | 附带 `tag`（显示名消歧序号，1 = 首个/唯一持有者，前端不显示后缀；2+ 显示 `名字#2`） |
+| 用户名体系 | `username` 仍严格唯一（登录身份）；`display_name` 允许重名，用 `#序号` 消歧 |
+
+**最后在线时间的写入**：由 `resolveUserId` 在**每次已认证请求**的鉴权阶段，与 `SELECT sessions` 合并进同一次 Turso pipeline 往返，条件 UPDATE `sessions.last_used_at`（60s 节流，**不新增任何端点、定时器或额外请求**）。收消息的 sync 轮询、会话列表轮询、发消息等都会顺带更新。`revoked=1` 的会话不再贡献在线时间，因此登出/密码重置后立即停止刷新。
+
 ### GET /conversations — 会话列表（按最后消息时间倒序）
 响应 data 元素：
 ```json
@@ -115,7 +124,8 @@ Base URL：`/api/v1`（同站点相对路径）
   "id": "uuid", "type": "direct|group", "name": "群名|null",
   "updated_at": "ISO", "last_message": "...|null", "last_at": "ISO|null",
   "last_read_at": "ISO|null", "unread_count": 0,
-  "peer": { "id": "...", "username": "...", "display_name": "..." }  // 仅 direct
+  "peer": { "id": "...", "username": "...", "display_name": "...", "tag": 1,
+            "last_seen_at": "ISO|null", "online": true }  // 仅 direct
 }
 ```
 

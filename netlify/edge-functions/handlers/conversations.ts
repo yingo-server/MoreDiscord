@@ -3,6 +3,7 @@ import { requireUser } from "../_shared/auth.ts";
 import { ok, HttpError } from "../_shared/response.ts";
 import { validateGroupName, strArray, newId, nowIso } from "../_shared/validate.ts";
 import { attachTags } from "../_shared/displayName.ts";
+import { lastSeenMap, isOnline } from "../_shared/presence.ts";
 import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../_shared/db.ts";
 import type { Ctx } from "./types.ts";
 
@@ -47,14 +48,24 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
     [userId],
   );
 
-  const out = [];
+  // 一次性收集所有会话成员（本就要查，缓存复用，不额外增加往返），再批量取最后在线
+  const membersByConv = new Map<string, Record<string, any>[]>();
+  const allMemberIds: string[] = [];
   for (const r of rows) {
-    const members = await dbAll(
+    const mem = await dbAll(
       `SELECT cm.user_id, u.username, u.display_name
        FROM conversation_members cm JOIN users u ON u.id=cm.user_id
        WHERE cm.conversation_id=?`,
-      [r.id],
+      [r.id as string],
     );
+    membersByConv.set(r.id as string, mem);
+    for (const m of mem) allMemberIds.push(m.user_id as string);
+  }
+  const seen = await lastSeenMap(dbAll as any, allMemberIds);
+
+  const out = [];
+  for (const r of rows) {
+    const members = membersByConv.get(r.id as string) ?? [];
     let peer: Record<string, any> | null = r.type === "direct" ? computePeer(members, userId) : null;
     if (peer) {
       const full = await dbGet(
@@ -63,7 +74,12 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
       );
       if (full) {
         const { getTag } = await import("../_shared/displayName.ts");
-        peer = { ...peer, tag: await getTag(dbGet, full as any) };
+        peer = {
+          ...peer,
+          tag: await getTag(dbGet, full as any),
+          last_seen_at: seen.get(peer.id as string) ?? null,
+          online: isOnline(seen.get(peer.id as string)),
+        };
       }
     }
     out.push({
@@ -95,6 +111,8 @@ export async function getConversation(ctx: Ctx, id: string): Promise<Response> {
     [id],
   );
   const my = members.find((m) => m.user_id === userId);
+  const seen = await lastSeenMap(dbAll as any, members.map((m) => m.user_id as string));
+  const tagged = await attachTags(dbAll as any, members as any);
   return ok({
     id: conv.id,
     type: conv.type,
@@ -104,7 +122,11 @@ export async function getConversation(ctx: Ctx, id: string): Promise<Response> {
     updated_at: conv.updated_at,
     my_role: my?.role ?? "member",
     member_count: members.length,
-    members: await attachTags(dbAll as any, members as any),
+    members: tagged.map((m: any) => ({
+      ...m,
+      last_seen_at: seen.get(m.user_id as string) ?? null,
+      online: isOnline(seen.get(m.user_id as string)),
+    })),
   });
 }
 

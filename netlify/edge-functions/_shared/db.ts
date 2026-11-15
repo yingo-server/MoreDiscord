@@ -87,6 +87,28 @@ export async function run(sql: string, params: any[] = []): Promise<void> {
   if (r.error) throw new Error(r.error.message);
 }
 
+/**
+ * 一次 pipeline 往返内先 SELECT 再 UPDATE（合并鉴权查询与「最后在线」节流写入）。
+ * 无 baton：两条语句各自 autocommit 即可，不需要事务。
+ * 用于 resolveUserId —— 不新增任何 HTTP 请求。
+ */
+export async function getAndRun(
+  selectSql: string, selectParams: any[],
+  writeSql: string, writeParams: any[],
+): Promise<Record<string, any> | null> {
+  const results = await execute([
+    { type: "execute", stmt: { sql: selectSql, args: selectParams.map(toArg) } },
+    { type: "execute", stmt: { sql: writeSql, args: writeParams.map(toArg) } },
+  ]);
+  for (const entry of results) {
+    const e = extractResult(entry);
+    if (e.error) throw new Error(e.error.message);
+  }
+  const r = extractResult(results[0]);
+  const rows = decodeRows(r.rows, r.cols);
+  return rows[0] ?? null;
+}
+
 function toArg(v: any): any {
   if (v == null) return { type: "null", value: null };
   if (typeof v === "number") {
