@@ -1,10 +1,9 @@
 // handlers/conversations.ts —— 会话管理（规格 §9）
-import { requireUser } from "../_shared/auth.ts";
-import { ok, HttpError } from "../_shared/response.ts";
-import { validateGroupName, strArray, newId, nowIso } from "../_shared/validate.ts";
-import { attachTags } from "../_shared/displayName.ts";
-import { lastSeenMap, isOnline } from "../_shared/presence.ts";
-import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../_shared/db.ts";
+import { ok, HttpError } from "../platform/response.ts";
+import { validateGroupName, strArray, newId, nowIso } from "../platform/validate.ts";
+import { attachTags } from "../domain/tags.ts";
+import { lastSeenMap, isOnline } from "../domain/presence.ts";
+import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../platform/db.ts";
 import type { Ctx } from "./types.ts";
 
 const MAX_GROUP_SIZE = 10;
@@ -34,7 +33,7 @@ function computePeer(members: Record<string, any>[], me: string) {
 
 // GET /api/v1/conversations
 export async function listConversations(ctx: Ctx): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const rows = await dbAll(
     `SELECT c.id,c.type,c.name,c.updated_at,
       (SELECT content FROM messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC,m.id DESC LIMIT 1) last_message,
@@ -121,7 +120,7 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
 
 // GET /api/v1/conversations/:id
 export async function getConversation(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const conv = await dbGet("SELECT * FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
   await requireMember(userId, id);
@@ -155,7 +154,7 @@ export async function getConversation(ctx: Ctx, id: string): Promise<Response> {
 
 // POST /api/v1/conversations/direct
 export async function createDirect(ctx: Ctx): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const targetUserId = ctx.body.targetUserId;
   if (typeof targetUserId !== "string" || !targetUserId) {
     throw new HttpError("INVALID_INPUT", "missing field: targetUserId");
@@ -197,7 +196,7 @@ export async function createDirect(ctx: Ctx): Promise<Response> {
 
 // POST /api/v1/conversations/group
 export async function createGroup(ctx: Ctx): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const name = validateGroupName(ctx.body.name);
   // B11: 去重前先限长（strArray 内），再过滤自己
   const memberIds = [...new Set(strArray(ctx.body.memberIds ?? []))].filter((m) => m !== userId);
@@ -234,7 +233,7 @@ export async function createGroup(ctx: Ctx): Promise<Response> {
 
 // PATCH /api/v1/conversations/:id —— 改群名
 export async function renameConversation(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const conv = await requireOwner(userId, id);
   if (conv.type !== "group") throw new HttpError("NOT_A_GROUP", "cannot rename a direct conversation");
   const name = validateGroupName(ctx.body.name);
@@ -244,7 +243,7 @@ export async function renameConversation(ctx: Ctx, id: string): Promise<Response
 
 // POST /api/v1/conversations/:id/members —— 加成员
 export async function addMember(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireOwner(userId, id);
   const targetUserId = ctx.body.userId;
   if (typeof targetUserId !== "string" || !targetUserId) {
@@ -275,7 +274,7 @@ export async function addMember(ctx: Ctx, id: string): Promise<Response> {
 
 // DELETE /api/v1/conversations/:id/members/:userId —— 移除成员
 export async function removeMember(ctx: Ctx, id: string, targetUserId: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireOwner(userId, id);
   if (targetUserId === userId) {
     throw new HttpError("CANNOT_REMOVE_OWNER", "owner cannot remove self; transfer or delete the group");
@@ -294,7 +293,7 @@ export async function removeMember(ctx: Ctx, id: string, targetUserId: string): 
 
 // POST /api/v1/conversations/:id/leave
 export async function leaveConversation(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const conv = await dbGet("SELECT type FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
   // 规格 §4：私聊无管理操作（含 leave），拒绝以避免历史消息分裂（B1）
@@ -312,7 +311,7 @@ export async function leaveConversation(ctx: Ctx, id: string): Promise<Response>
 
 // DELETE /api/v1/conversations/:id —— 解散群聊（保留 messages）
 export async function deleteConversation(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireOwner(userId, id);
   await transaction("write", async (tx) => {
     await tx.run("DELETE FROM conversation_members WHERE conversation_id=?", [id]);
@@ -324,7 +323,7 @@ export async function deleteConversation(ctx: Ctx, id: string): Promise<Response
 
 // POST /api/v1/conversations/:id/transfer
 export async function transferOwnership(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireOwner(userId, id);
   const targetUserId = ctx.body.userId;
   if (typeof targetUserId !== "string" || !targetUserId) {
@@ -345,7 +344,7 @@ export async function transferOwnership(ctx: Ctx, id: string): Promise<Response>
 
 // PATCH /api/v1/conversations/:id/read
 export async function markRead(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireMember(userId, id);
   const lastReadAt = typeof ctx.body.last_read_at === "string" && ctx.body.last_read_at
     ? ctx.body.last_read_at

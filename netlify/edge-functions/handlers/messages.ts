@@ -1,8 +1,7 @@
 // handlers/messages.ts —— 消息发送 / 分页读取 / 增量同步（规格 §10）
-import { requireUser } from "../_shared/auth.ts";
-import { ok, HttpError } from "../_shared/response.ts";
-import { validateMessageContent, newId, nowIso, encodeCursor, decodeCursor } from "../_shared/validate.ts";
-import { get as dbGet, all as dbAll, run as dbRun } from "../_shared/db.ts";
+import { ok, HttpError } from "../platform/response.ts";
+import { validateMessageContent, newId, nowIso, encodeCursor, decodeCursor } from "../platform/validate.ts";
+import { get as dbGet, all as dbAll, run as dbRun } from "../platform/db.ts";
 import type { Ctx } from "./types.ts";
 
 const MAX_LIMIT = 50;
@@ -19,7 +18,7 @@ async function requireMemberRead(userId: string, conversationId: string) {
 
 // POST /api/v1/conversations/:id/messages
 export async function sendMessage(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireMemberRead(userId, id);
   const content = validateMessageContent(ctx.body.content);
   const msgId = newId();
@@ -42,7 +41,7 @@ function parseLimit(ctx: Ctx): number {
 
 // GET /api/v1/conversations/:id/messages?before=&limit= —— 复合游标倒序分页
 export async function listMessages(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireMemberRead(userId, id);
   const limit = parseLimit(ctx);
   const cursor = decodeCursor(ctx.url.searchParams.get("before"));
@@ -62,7 +61,7 @@ export async function listMessages(ctx: Ctx, id: string): Promise<Response> {
 
 // GET /api/v1/conversations/:id/messages/sync?after=&limit= —— 增量同步
 export async function syncMessages(ctx: Ctx, id: string): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   await requireMemberRead(userId, id);
   const limit = parseLimit(ctx);
   const cursor = decodeCursor(ctx.url.searchParams.get("after"));

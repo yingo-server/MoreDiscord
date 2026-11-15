@@ -1,4 +1,6 @@
-// _shared/response.ts —— 统一 JSON / 错误（规格 §11）
+export { HttpError } from "../contracts/httpError.ts";
+import { HttpError } from "../contracts/httpError.ts";
+// response.ts —— 统一 JSON / 错误（规格 §11）
 import { withCors } from "./cors.ts";
 
 export interface ApiError {
@@ -47,15 +49,6 @@ const STATUS_BY_CODE: Record<string, number> = {
   ALREADY_MEMBER: 409,
 };
 
-export class HttpError extends Error {
-  code: string;
-  status: number;
-  constructor(code: string, message: string) {
-    super(message);
-    this.code = code;
-    this.status = STATUS_BY_CODE[code] ?? 500;
-  }
-}
 
 export function failErr(e: unknown): Response {
   if (e instanceof HttpError) return fail(e.code, e.message, e.status);

@@ -1,4 +1,4 @@
-// _shared/presence.ts —— 「最后一次在线」推导（零额外轮询、零新增表）
+// presence.ts —— 「最后一次在线」推导（零额外轮询、零新增表）
 // 数据源：sessions.last_used_at（由 resolveUserId 在鉴权时同一次 pipeline 内节流更新）
 // 读取：搭在现有 conversations / conversation 查询上，一次批量子查询带出
 

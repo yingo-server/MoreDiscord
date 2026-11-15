@@ -1,15 +1,14 @@
 // handlers/admin.ts —— 管理员端点（架构方案 §5.2 清单）
 // 鉴权：session_token + is_admin 判定（users 表 admin 列，1 = 管理员）
-import { requireUser } from "../_shared/auth.ts";
-import { ok, HttpError } from "../_shared/response.ts";
-import { newId, nowIso, strArray, encodeCursor, decodeCursor, validateDisplayName } from "../_shared/validate.ts";
-import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../_shared/db.ts";
+import { ok, HttpError } from "../platform/response.ts";
+import { newId, nowIso, strArray, encodeCursor, decodeCursor, validateDisplayName } from "../platform/validate.ts";
+import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../platform/db.ts";
 import type { Ctx } from "./types.ts";
 
 const MAX_LIMIT = 50;
 
-async function requireAdmin(req: Request): Promise<string> {
-  const userId = await requireUser(req);
+async function requireAdmin(ctx: Ctx): Promise<string> {
+  const userId = ctx.userId!;
   const u = await dbGet("SELECT admin FROM users WHERE id=?", [userId]);
   if (!u || Number(u.admin) !== 1) throw new HttpError("FORBIDDEN", "admin role required");
   return userId;
@@ -25,7 +24,7 @@ function limitOf(url: URL): number {
 
 // GET /api/v1/admin/users?search=&cursor=<username>&limit=
 export async function adminListUsers(ctx: Ctx): Promise<Response> {
-  const adminId = await requireAdmin(ctx.req);
+  const adminId = await requireAdmin(ctx);
   void adminId;
   const limit = limitOf(ctx.url);
   const search = ctx.url.searchParams.get("search")?.toLowerCase() ?? "";
@@ -44,7 +43,7 @@ export async function adminListUsers(ctx: Ctx): Promise<Response> {
   );
   const hasMore = users.length > limit;
   const page = hasMore ? users.slice(0, limit) : users;
-  const { attachTags } = await import("../_shared/displayName.ts");
+  const { attachTags } = await import("../domain/tags.ts");
   const tagged = await attachTags(dbAll as any, page.map((u: any) => ({ ...u, id: u.id })) as any);
   return ok({
     users: tagged,
@@ -56,7 +55,7 @@ export async function adminListUsers(ctx: Ctx): Promise<Response> {
 
 // GET /api/v1/admin/users/:id
 export async function adminGetUser(ctx: Ctx, id: string): Promise<Response> {
-  await requireAdmin(ctx.req);
+  await requireAdmin(ctx);
   const u = await dbGet(
     "SELECT id, username, display_name, email, created_at, admin FROM users WHERE id=?",
     [id],
@@ -73,7 +72,7 @@ export async function adminGetUser(ctx: Ctx, id: string): Promise<Response> {
 
 // PATCH /api/v1/admin/users/:id —— {admin?: 0|1, display_name?: string|null}（封禁通过 admin 剥离与审计日志实现）
 export async function adminPatchUser(ctx: Ctx, id: string): Promise<Response> {
-  const adminId = await requireAdmin(ctx.req);
+  const adminId = await requireAdmin(ctx);
   const target = await dbGet("SELECT id, admin FROM users WHERE id=?", [id]);
   if (!target) throw new HttpError("USER_NOT_FOUND", "user does not exist");
 
@@ -107,7 +106,7 @@ export async function adminPatchUser(ctx: Ctx, id: string): Promise<Response> {
 
 // GET /api/v1/admin/channels?cursor=<created_at|id>&limit=&type=
 export async function adminListChannels(ctx: Ctx): Promise<Response> {
-  await requireAdmin(ctx.req);
+  await requireAdmin(ctx);
   const limit = limitOf(ctx.url);
   const type = ctx.url.searchParams.get("type");
   if (type && type !== "direct" && type !== "group") {
@@ -132,7 +131,7 @@ export async function adminListChannels(ctx: Ctx): Promise<Response> {
 
 // DELETE /api/v1/admin/channels/:id —— 强制解散（保留 messages，同用户解散语义）
 export async function adminDeleteChannel(ctx: Ctx, id: string): Promise<Response> {
-  const adminId = await requireAdmin(ctx.req);
+  const adminId = await requireAdmin(ctx);
   const conv = await dbGet("SELECT id FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
   await transaction("write", async (tx) => {
@@ -148,7 +147,7 @@ export async function adminDeleteChannel(ctx: Ctx, id: string): Promise<Response
 
 // GET /api/v1/admin/channels/:id/messages?cursor=&limit= —— 跨权限审计
 export async function adminAuditMessages(ctx: Ctx, id: string): Promise<Response> {
-  await requireAdmin(ctx.req);
+  await requireAdmin(ctx);
   const limit = limitOf(ctx.url);
   const conv = await dbGet("SELECT id FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
@@ -169,7 +168,7 @@ export async function adminAuditMessages(ctx: Ctx, id: string): Promise<Response
 
 // GET /api/v1/admin/audit-log?cursor=<created_at|id>&limit=
 export async function adminAuditLog(ctx: Ctx): Promise<Response> {
-  await requireAdmin(ctx.req);
+  await requireAdmin(ctx);
   const limit = limitOf(ctx.url);
   const [cAt, cId] = decodeCursor(ctx.url.searchParams.get("cursor")) ?? ["9999-12-31T23:59:59.999Z", "\uffff"];
   const rows = await dbAll(
@@ -189,7 +188,7 @@ export async function adminAuditLog(ctx: Ctx): Promise<Response> {
 
 // GET /api/v1/admin/stats/overview
 export async function adminStats(ctx: Ctx): Promise<Response> {
-  await requireAdmin(ctx.req);
+  await requireAdmin(ctx);
   const users = await dbGet("SELECT COUNT(*) AS n FROM users");
   const convs = await dbGet("SELECT COUNT(*) AS n FROM conversations");
   const groups = await dbGet("SELECT COUNT(*) AS n FROM conversations WHERE type='group'");

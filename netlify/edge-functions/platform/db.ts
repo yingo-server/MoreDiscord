@@ -1,4 +1,4 @@
-// _shared/db.ts —— 唯一接触 Turso 的模块
+// db.ts —— 唯一接触 Turso 的模块
 // 换数据库只改此文件。
 
 const TURSO_DATABASE_URL = Deno.env.get("TURSO_DATABASE_URL")!;

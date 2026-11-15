@@ -16,7 +16,7 @@ jobs:
         run: |
           cd netlify/edge-functions
           deno check api.ts
-          for f in _shared/*.ts handlers/*.ts; do deno check "$f"; done
+          for f in contracts/*.ts platform/*.ts domain/*.ts handlers/*.ts; do deno check "$f"; done
 
   frontend-check:
     runs-on: ubuntu-latest
@@ -58,7 +58,7 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           cat > live_test.ts <<'EOF'
-          import { get, all, run, transaction } from "/var/minis/workspace/chat-backend/netlify/edge-functions/_shared/db.ts";
+          import { get, all, run, transaction } from "/var/minis/workspace/chat-backend/netlify/edge-functions/platform/db.ts";
           let pass = 0, fail = 0;
           const check = (n: string, c: boolean, e?: any) => { c ? pass++ : fail++; console.log(c ? "PASS" : "FAIL", n, c ? "" : JSON.stringify(e)); };
           await run("DELETE FROM messages WHERE sender_id LIKE 'it-%'").catch(()=>{});
@@ -112,5 +112,5 @@ jobs:
           Deno.exit(fail ? 1 : 0);
           EOF
           # 修正 import 路径（CI 环境仓库根目录）
-          sed -i 's|/var/minis/workspace/chat-backend/netlify/edge-functions/_shared/db.ts|./netlify/edge-functions/_shared/db.ts|' live_test.ts
+          sed -i 's|/var/minis/workspace/chat-backend/netlify/edge-functions/platform/db.ts|./netlify/edge-functions/platform/db.ts|' live_test.ts
           deno run -A live_test.ts

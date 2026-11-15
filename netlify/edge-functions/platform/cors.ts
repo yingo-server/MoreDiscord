@@ -1,4 +1,4 @@
-// _shared/cors.ts —— 预检 + 响应头（规格 §12）
+// cors.ts —— 预检 + 响应头（规格 §12）
 export const CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",

@@ -1,13 +1,12 @@
 // handlers/user.ts —— 账户管理（规格 §8）
-import { requireUser } from "../_shared/auth.ts";
-import { ok, HttpError } from "../_shared/response.ts";
-import { validateUsername, validateDisplayName } from "../_shared/validate.ts";
-import { run as dbRun, isUniqueViolation } from "../_shared/db.ts";
+import { ok, HttpError } from "../platform/response.ts";
+import { validateUsername, validateDisplayName } from "../platform/validate.ts";
+import { run as dbRun, isUniqueViolation } from "../platform/db.ts";
 import type { Ctx } from "./types.ts";
 
 // PATCH /api/v1/user/username
 export async function updateUsername(ctx: Ctx): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   const username = validateUsername(ctx.body.username);
   try {
     await dbRun("UPDATE users SET username=? WHERE id=?", [username, userId]);
@@ -20,7 +19,7 @@ export async function updateUsername(ctx: Ctx): Promise<Response> {
 
 // PATCH /api/v1/user/profile
 export async function updateProfile(ctx: Ctx): Promise<Response> {
-  const userId = await requireUser(ctx.req);
+  const userId = ctx.userId!;
   // B4: 统一校验 trim/非空/≤64，空串存 NULL（与 SQL COALESCE 口径一致）
   const dn = validateDisplayName(ctx.body.display_name);
   await dbRun("UPDATE users SET display_name=? WHERE id=?", [dn, userId]);

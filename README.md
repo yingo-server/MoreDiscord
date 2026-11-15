@@ -7,22 +7,17 @@
 ```
 ├── netlify.toml                    # 唯一一条 edge_functions 路由
 ├── schema.sql                      # Turso 全量建表 SQL
-├── smoke_test.ts                   # 离线冒烟测试（41 断言，mock Turso/Identity）
+├── smoke_test.ts                   # 离线冒烟测试（44 断言，mock Turso/Identity）
 └── netlify/edge-functions/
-    ├── api.ts                      # 统一路由 pathname → handler
-    ├── _shared/
-    │   ├── cors.ts                 # 预检 + 响应头（错误响应也带 CORS）
-    │   ├── auth.ts                 # ★ 唯一接触 Netlify Identity；session 管理
-    │   ├── db.ts                   # ★ 唯一接触 Turso（get/all/run/transaction）
-    │   ├── response.ts             # 统一 {"data":..,"error":{code,message}}
-    │   └── validate.ts             # 输入校验 + 工具
-    └── handlers/
-        ├── types.ts                # Ctx 类型
-        ├── auth.ts                 # signup/verify/login/logout/recover/me
-        ├── user.ts                 # username/profile
-        ├── conversations.ts        # 11 个会话端点
-        └── messages.ts             # send/list/sync
+    ├── api.ts                      # L4 路由层：查表 → 一次鉴权 → dispatch
+    ├── contracts/                  # L0 路由表、错误码、DTO、HttpError
+    ├── platform/                   # L1 db(Turso) / identity(GoTrue) / session / cors / response / validate
+    ├── domain/                     # L2 tags / presence
+    ├── handlers/                   # L3 应用层：req → domain → Response
+    └── handlers/index.ts           # 汇总导出，供路由表按名 dispatch
 ```
+
+单向依赖：L4 → L3 → L2 → L1 → L0。下层不 import 上层。
 
 ## 部署步骤
 
@@ -46,7 +41,7 @@
 
 ```bash
 deno check api.ts                                   # 类型检查（已通过）
-deno run -A smoke_test.ts                           # 41 断言冒烟测试（已通过）
+deno run -A smoke_test.ts                           # 44 断言冒烟测试（已通过）
 ```
 
 smoke_test.ts mock 了 Turso pipeline 与 Identity HTTP，覆盖：注册（预留+回填+补偿）、用户名冲突、弱密码补偿、登录/登出吊销、伪造 token 401、私聊去重同 id、10 人上限（创建与加成员双校验）、owner 规则（不可直接退群/转让校验）、成员退出失权、4000 字符上限、游标分页、标记已读、CORS/OPTIONS。

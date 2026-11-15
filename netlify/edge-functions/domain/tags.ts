@@ -1,4 +1,4 @@
-// _shared/displayName.ts —— 显示名 tag 序号计算（Discord 风格消歧）
+// displayName.ts —— 显示名 tag 序号计算（Discord 风格消歧）
 // 规则：同 display_name 的用户按 created_at 升序，第一个 tag=1（前端不显示），其后 2、3……
 // tag 不持久化，实时计算。username（登录名）始终唯一，不参与此逻辑。
 

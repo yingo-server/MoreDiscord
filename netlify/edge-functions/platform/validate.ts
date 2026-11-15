@@ -1,4 +1,4 @@
-// _shared/validate.ts —— 输入校验（规格 §7/§8/§9）
+// validate.ts —— 输入校验（规格 §7/§8/§9）
 import { HttpError } from "./response.ts";
 
 const USERNAME_RE = /^[a-z0-9_-]{3,32}$/;

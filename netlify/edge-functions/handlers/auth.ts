@@ -1,8 +1,10 @@
 // handlers/auth.ts —— 注册/确认/登录/登出/找回/当前用户（规格 §7）
-import { resolveUserId, revokeSessionByRequest, createSession, identitySignup, identityPasswordToken, identityVerify, identityRecover, revokeSessionsForUser, compensateUser } from "../_shared/auth.ts";
-import { ok, fail, HttpError, readJson } from "../_shared/response.ts";
-import { validateUsername, requireEmail, requireString, newId, nowIso } from "../_shared/validate.ts";
-import { get as dbGet, transaction, isUniqueViolation } from "../_shared/db.ts";
+import { resolveUserId, revokeSessionByRequest, createSession, revokeSessionsForUser, compensateUser } from "../platform/session.ts";
+import { identitySignup, identityPasswordToken, identityVerify, identityRecover } from "../platform/identity.ts";
+import { reserveUsername, backfillUserId } from "../platform/session.ts";
+import { ok, fail, HttpError, readJson } from "../platform/response.ts";
+import { validateUsername, requireEmail, requireString, newId, nowIso } from "../platform/validate.ts";
+import { get as dbGet, transaction, isUniqueViolation } from "../platform/db.ts";
 
 interface Ctx {
   req: Request;
@@ -204,7 +206,7 @@ export async function me({ req }: Ctx): Promise<Response> {
   if (!userId) throw new HttpError("UNAUTHORIZED", "missing or invalid session token");
   const row = await dbGet("SELECT id, username, display_name, email, created_at FROM users WHERE id=?", [userId]);
   if (!row) throw new HttpError("UNAUTHORIZED", "user not found");
-  const { getTag } = await import("../_shared/displayName.ts");
+  const { getTag } = await import("../domain/tags.ts");
   const tag = await getTag(dbGet, row as any);
   return ok({ ...row, tag });
 }
