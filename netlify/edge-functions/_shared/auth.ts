@@ -61,6 +61,9 @@ function mapIdentityError(json: any, status: number): HttpError {
   if (msg.includes("invalid_grant") || msg.includes("invalid email or password") || msg.includes("no user found") || msg.includes("invalid credentials")) {
     return new HttpError("INVALID_CREDENTIALS", "invalid email or password");
   }
+  if (msg.includes("password") && (msg.includes("short") || msg.includes("weak") || msg.includes("at least"))) {
+    return new HttpError("INVALID_INPUT", "password does not meet requirements");
+  }
   if (msg.includes("confirm") || msg.includes("not confirmed")) {
     return new HttpError("EMAIL_NOT_CONFIRMED", "email not confirmed");
   }
