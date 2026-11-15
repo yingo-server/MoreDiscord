@@ -168,8 +168,11 @@ export async function recover({ body }: Ctx): Promise<Response> {
 export async function me({ req }: Ctx): Promise<Response> {
   const userId = await resolveUserId(req);
   if (!userId) throw new HttpError("UNAUTHORIZED", "missing or invalid session token");
-  const row = await dbGet("SELECT id, username, display_name, email FROM users WHERE id=?", [userId]);
+  const row = await dbGet("SELECT id, username, display_name, email, created_at FROM users WHERE id=?", [userId]);
   if (!row) throw new HttpError("UNAUTHORIZED", "user not found");
+  const { getTag } = await import("../_shared/displayName.ts");
+  const tag = await getTag(dbGet, row as any);
+  return ok({ ...row, tag });
   return ok(row);
 }
 

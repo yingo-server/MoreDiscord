@@ -2,6 +2,7 @@
 import { requireUser } from "../_shared/auth.ts";
 import { ok, HttpError } from "../_shared/response.ts";
 import { validateGroupName, strArray, newId, nowIso } from "../_shared/validate.ts";
+import { attachTags } from "../_shared/displayName.ts";
 import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../_shared/db.ts";
 import type { Ctx } from "./types.ts";
 
@@ -54,6 +55,17 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
        WHERE cm.conversation_id=?`,
       [r.id],
     );
+    let peer = r.type === "direct" ? computePeer(members, userId) : null;
+    if (peer) {
+      const full = await dbGet(
+        "SELECT id, username, display_name, created_at FROM users WHERE id=?",
+        [peer.id],
+      );
+      if (full) {
+        const { getTag } = await import("../_shared/displayName.ts");
+        peer = { ...peer, tag: await getTag(dbGet, full as any) };
+      }
+    }
     out.push({
       id: r.id,
       type: r.type,
@@ -92,7 +104,7 @@ export async function getConversation(ctx: Ctx, id: string): Promise<Response> {
     updated_at: conv.updated_at,
     my_role: my?.role ?? "member",
     member_count: members.length,
-    members,
+    members: await attachTags(dbAll as any, members as any),
   });
 }
 

@@ -38,7 +38,9 @@ export async function adminListUsers(ctx: Ctx): Promise<Response> {
   );
   const hasMore = users.length > limit;
   const page = hasMore ? users.slice(0, limit) : users;
-  return ok({ users: page, next_cursor: hasMore ? page[page.length - 1].username : null });
+  const { attachTags } = await import("../_shared/displayName.ts");
+  const tagged = await attachTags(dbAll as any, page as any);
+  return ok({ users: tagged, next_cursor: hasMore ? page[page.length - 1].username : null });
 }
 
 // GET /api/v1/admin/users/:id
