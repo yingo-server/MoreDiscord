@@ -103,9 +103,7 @@ const EN: Record<string, string> = {
   "sidebar.leaveGroup": "Leave Group",
 
   // chat page
-  "chat.notFound": "Conversation not found or you don't have access",
-  "chat.live": "Live",
-  "chat.reconnecting": "Reconnecting…",
+  "chat.notFound": "Conversation not found",
   "chat.members": "{n} members",
 
   // message input / list
@@ -242,9 +240,7 @@ const ZH: Record<string, string> = {
   "sidebar.deleteConv": "删除会话",
   "sidebar.leaveGroup": "退出群组",
 
-  "chat.notFound": "会话不存在或无权访问",
-  "chat.live": "在线",
-  "chat.reconnecting": "正在重新连接…",
+  "chat.notFound": "会话不存在",
   "chat.members": "{n} 位成员",
 
   "input.placeholder": "输入消息…",

@@ -89,10 +89,6 @@ export default function ChatPage() {
         {isGroup && memberCount != null && (
           <span className="text-xs text-muted-foreground">{t("chat.members", { n: memberCount })}</span>
         )}
-        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-          {t("chat.live")}
-        </span>
       </div>
       <MessageList members={detail?.members ?? []} />
       <MessageInput />
