@@ -295,7 +295,15 @@ const origFetch = globalThis.fetch;
     return new Response(JSON.stringify({ results }), { status: 200 });
   }
   // Identity mock
-  const body = init?.body ? JSON.parse(init.body) : {};
+  let body: any = {};
+  if (init?.body) {
+    const ct = (init.headers?.["Content-Type"] ?? init.headers?.get?.("Content-Type") ?? "") as string;
+    if (ct.includes("x-www-form-urlencoded")) {
+      body = Object.fromEntries(new URLSearchParams(String(init.body)));
+    } else {
+      body = JSON.parse(String(init.body));
+    }
+  }
   const path = url.replace(/^https?:\/\/[^/]+/, "");
   if (path.endsWith("/token") && body.grant_type === "password") {
     const uid = body.email === "alice@test.com" ? "id-alice" : body.email === "bob@test.com" ? "id-bob" : null;
