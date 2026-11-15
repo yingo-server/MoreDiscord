@@ -4,9 +4,10 @@ import { LogOut, User, MessageSquare, Info, Shield } from "lucide-react"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { useUIStore } from "@/stores/useUIStore"
 import { APP_VERSION } from "@/lib/version"
+import { formatDisplayName } from "@/lib/displayName"
+import { t } from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "./ThemeToggle"
@@ -23,7 +24,7 @@ export function Header() {
     navigate("/login")
   }
 
-  const displayName = user ? (user.display_name || user.username) : "…"
+  const displayName = user ? formatDisplayName(user) : "…"
   const initials = displayName.slice(0, 2).toUpperCase()
   const isAdmin = user?.admin === 1
 
@@ -35,7 +36,7 @@ export function Header() {
 
       <div className="flex items-center gap-2">
         <MessageSquare className="h-5 w-5 text-primary" />
-        <span className="font-semibold hidden sm:inline">Coalchat</span>
+        <span className="font-semibold hidden sm:inline">MoreDiscord</span>
       </div>
 
       <div className="flex-1" />
@@ -43,7 +44,7 @@ export function Header() {
       {isAdmin && (
         <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => navigate("/admin")}>
           <Shield className="h-3.5 w-3.5" />
-          Admin
+          {t("header.admin")}
         </Button>
       )}
 
@@ -67,23 +68,23 @@ export function Header() {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => navigate("/profile")}>
             <User className="mr-2 h-4 w-4" />
-            Profile
+            {t("header.profile")}
           </DropdownMenuItem>
           {isAdmin && (
             <DropdownMenuItem onClick={() => navigate("/admin")}>
               <Shield className="mr-2 h-4 w-4" />
-              Admin Panel
+              {t("header.adminPanel")}
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setAboutOpen(true)}>
             <Info className="mr-2 h-4 w-4" />
-            About & Version
+            {t("header.about")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
-            Logout
+            {t("header.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -91,12 +92,12 @@ export function Header() {
       <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>About Coalchat</DialogTitle>
-            <DialogDescription>Build information</DialogDescription>
+            <DialogTitle>{t("header.aboutTitle")}</DialogTitle>
+            <DialogDescription>{t("header.aboutDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Version</span>
+              <span className="text-muted-foreground">{t("common.version")}</span>
               <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{APP_VERSION}</code>
             </div>
           </div>

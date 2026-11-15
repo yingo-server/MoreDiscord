@@ -13,6 +13,7 @@ import { ChannelsTab } from "@/components/admin/ChannelsTab"
 import { AuditTab } from "@/components/admin/AuditTab"
 import { UsersTab } from "@/components/admin/UsersTab"
 import { ShieldAlert } from "lucide-react"
+import { t } from "@/i18n"
 
 export default function AdminPage() {
   const user = useAuthStore((s) => s.user)
@@ -53,7 +54,7 @@ export default function AdminPage() {
       await confirm.onConfirm()
       setConfirm(null)
     } catch (e: unknown) {
-      addToast((e as Error)?.message || "Operation failed", "error")
+      addToast((e as Error)?.message || t("admin.opFailed"), "error")
     } finally {
       setBusy(false)
     }
@@ -63,8 +64,8 @@ export default function AdminPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <ShieldAlert className="h-10 w-10 text-muted-foreground" />
-        <p className="text-lg font-medium">需要管理员权限</p>
-        <p className="text-sm text-muted-foreground">Administrator permission is required to access this page.</p>
+        <p className="text-lg font-medium">{t("admin.denied")}</p>
+        <p className="text-sm text-muted-foreground">{t("admin.deniedDesc")}</p>
       </div>
     )
   }
@@ -73,8 +74,8 @@ export default function AdminPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <ShieldAlert className="h-10 w-10 text-destructive" />
-        <p className="text-lg font-medium">需要管理员权限</p>
-        <p className="text-sm text-muted-foreground">The server rejected this request (403 FORBIDDEN).</p>
+        <p className="text-lg font-medium">{t("admin.denied")}</p>
+        <p className="text-sm text-muted-foreground">{t("admin.forbiddenDesc")}</p>
       </div>
     )
   }
@@ -82,15 +83,15 @@ export default function AdminPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b px-6 py-4">
-        <h1 className="text-xl font-semibold">Admin Panel</h1>
-        <p className="text-sm text-muted-foreground">Manage channels, users and audit logs</p>
+        <h1 className="text-xl font-semibold">{t("admin.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("admin.subtitle")}</p>
       </div>
       <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
         <TabsList className="mx-6 mt-4 w-fit">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="channels">Channels</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="overview">{t("admin.tab.overview")}</TabsTrigger>
+          <TabsTrigger value="channels">{t("admin.tab.channels")}</TabsTrigger>
+          <TabsTrigger value="users">{t("admin.tab.users")}</TabsTrigger>
+          <TabsTrigger value="audit">{t("admin.tab.audit")}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-4">
           <OverviewTab />
@@ -113,9 +114,9 @@ export default function AdminPage() {
             <DialogDescription>{confirm?.description}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirm(null)} disabled={busy}>Cancel</Button>
+            <Button variant="outline" onClick={() => setConfirm(null)} disabled={busy}>{t("common.cancel")}</Button>
             <Button variant="destructive" onClick={handleConfirm} disabled={busy}>
-              {busy ? "Working..." : "Confirm"}
+              {busy ? t("common.working") : t("common.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

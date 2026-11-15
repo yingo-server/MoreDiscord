@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { formatDisplayName } from "@/lib/displayName"
+import { t } from "@/i18n"
 
 interface CreateRoomProps {
   open: boolean
@@ -55,7 +57,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
 
   const handleSelectUser = (u: User) => {
     setSelectedUser(u)
-    setSearchQuery(u.display_name || u.username)
+    setSearchQuery(formatDisplayName(u))
     setResults([])
   }
 
@@ -67,7 +69,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
 
   const handleCreateDirect = async () => {
     if (!selectedUser) {
-      setError("Please search and select a user")
+      setError(t("room.create.needUser"))
       return
     }
     setLoading(true)
@@ -80,7 +82,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
       setSelectedUser(null)
       navigate(`/chat/${conv.id}`)
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Failed to create conversation")
+      setError((err as Error)?.message || t("room.create.failed"))
     } finally {
       setLoading(false)
     }
@@ -88,11 +90,11 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
-      setError("Group name is required")
+      setError(t("room.create.needName"))
       return
     }
     if (groupSelected.length === 0) {
-      setError("Add at least one member")
+      setError(t("room.create.needMember"))
       return
     }
     setLoading(true)
@@ -105,7 +107,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
       setGroupSelected([])
       navigate(`/chat/${conv.id}`)
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Failed to create group")
+      setError((err as Error)?.message || t("room.create.groupFailed"))
     } finally {
       setLoading(false)
     }
@@ -128,21 +130,21 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New Conversation</DialogTitle>
-          <DialogDescription>Create a direct or group chat</DialogDescription>
+          <DialogTitle>{t("room.create.title")}</DialogTitle>
+          <DialogDescription>{t("room.create.desc")}</DialogDescription>
         </DialogHeader>
         {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full">
-            <TabsTrigger value="direct" className="flex-1">Direct</TabsTrigger>
-            <TabsTrigger value="group" className="flex-1">Group</TabsTrigger>
+            <TabsTrigger value="direct" className="flex-1">{t("room.create.direct")}</TabsTrigger>
+            <TabsTrigger value="group" className="flex-1">{t("room.create.group")}</TabsTrigger>
           </TabsList>
           <TabsContent value="direct" className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label>Search User</Label>
+              <Label>{t("room.create.searchUser")}</Label>
               <div className="relative">
                 <Input
-                  placeholder="Type username to search..."
+                  placeholder={t("room.create.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSelectedUser(null) }}
                 />
@@ -157,32 +159,32 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                       onClick={() => handleSelectUser(u)}
                     >
-                      <span className="font-medium">{u.display_name || u.username}</span>
+                      <span className="font-medium">{formatDisplayName(u)}</span>
                       <span className="text-xs text-muted-foreground">@{u.username}</span>
                     </button>
                   ))}
                 </div>
               )}
               {!searching && searchQuery.length >= 1 && results.length === 0 && !selectedUser && (
-                <p className="text-xs text-muted-foreground">No users found</p>
+                <p className="text-xs text-muted-foreground">{t("room.create.noUsers")}</p>
               )}
               {selectedUser && (
-                <p className="text-xs text-green-600">Selected: {selectedUser.display_name || selectedUser.username}</p>
+                <p className="text-xs text-green-600">{t("room.create.selected", { name: formatDisplayName(selectedUser) })}</p>
               )}
             </div>
             <Button className="w-full" onClick={handleCreateDirect} disabled={loading}>
-              {loading ? "Creating..." : "Start Conversation"}
+              {loading ? t("room.create.creating") : t("room.create.start")}
             </Button>
           </TabsContent>
           <TabsContent value="group" className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label>Group Name</Label>
-              <Input placeholder="Enter group name" value={groupName} onChange={(e) => setGroupName(e.target.value)} maxLength={64} />
+              <Label>{t("room.create.groupName")}</Label>
+              <Input placeholder={t("room.create.groupNamePlaceholder")} value={groupName} onChange={(e) => setGroupName(e.target.value)} maxLength={64} />
             </div>
             <div className="space-y-2">
-              <Label>Add Members</Label>
+              <Label>{t("room.create.addMembers")}</Label>
               <Input
-                placeholder="Search users..."
+                placeholder={t("admin.users.search")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -195,7 +197,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                       onClick={() => handleAddGroupMember(u)}
                     >
-                      <span className="font-medium">{u.display_name || u.username}</span>
+                      <span className="font-medium">{formatDisplayName(u)}</span>
                       <span className="text-xs text-muted-foreground">@{u.username}</span>
                     </button>
                   ))}
@@ -210,7 +212,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
                       className="flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-xs"
                       onClick={() => setGroupSelected((prev) => prev.filter((x) => x.id !== u.id))}
                     >
-                      {u.display_name || u.username}
+                      {formatDisplayName(u)}
                       <span aria-hidden>×</span>
                     </button>
                   ))}
@@ -218,7 +220,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
               )}
             </div>
             <Button className="w-full" onClick={handleCreateGroup} disabled={loading}>
-              {loading ? "Creating..." : "Create Group"}
+              {loading ? t("room.create.creating") : t("room.create.group")}
             </Button>
           </TabsContent>
         </Tabs>

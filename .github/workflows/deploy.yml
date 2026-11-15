@@ -18,6 +18,21 @@ jobs:
           deno check api.ts
           for f in _shared/*.ts handlers/*.ts; do deno check "$f"; done
 
+  frontend-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: 前端类型检查（不在此构建，构建由 Netlify buildbot 完成）
+        working-directory: frontend
+        run: |
+          npm ci
+          npx tsc -b
+
   smoke:
     runs-on: ubuntu-latest
     needs: typecheck

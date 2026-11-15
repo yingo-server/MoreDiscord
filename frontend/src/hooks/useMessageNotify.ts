@@ -2,7 +2,7 @@ import { useEffect } from "react"
 import { useRoomStore } from "@/stores/useRoomStore"
 import { setupAudioUnlock } from "@/lib/notify"
 
-const BASE_TITLE = "Coalchat"
+const BASE_TITLE = "MoreDiscord"
 
 function totalUnread() {
   const rooms = useRoomStore.getState().rooms

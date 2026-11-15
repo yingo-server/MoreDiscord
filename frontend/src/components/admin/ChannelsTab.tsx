@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { t } from "@/i18n"
 
 interface Props {
   onRequestConfirm: (title: string, description: string, onConfirm: () => Promise<void>) => void
@@ -36,8 +37,8 @@ export function ChannelsTab({ onRequestConfirm }: Props) {
 
   const handleDelete = (ch: AdminChannel) => {
     onRequestConfirm(
-      "Delete Channel",
-      `Permanently delete "${conversationTitle(ch as never)}" and all its messages? This cannot be undone.`,
+      t("admin.ch.delete"),
+      t("admin.ch.deleteConfirm", { name: conversationTitle(ch as never) }),
       async () => {
         await deleteAdminChannel(ch.id)
         setChannels((prev) => prev.filter((c) => c.id !== ch.id))
@@ -52,11 +53,11 @@ export function ChannelsTab({ onRequestConfirm }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-left">
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Type</th>
-              <th className="px-4 py-2 font-medium">Members</th>
-              <th className="px-4 py-2 font-medium">Created</th>
-              <th className="px-4 py-2 font-medium text-right">Actions</th>
+              <th className="px-4 py-2 font-medium">{t("admin.ch.name")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.ch.type")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.ch.members")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.ch.created")}</th>
+              <th className="px-4 py-2 font-medium text-right">{t("admin.ch.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -65,16 +66,16 @@ export function ChannelsTab({ onRequestConfirm }: Props) {
             ))}
             {channels.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No channels</td>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{t("admin.ch.empty")}</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-      {loading && <p className="mt-4 text-sm text-muted-foreground">Loading...</p>}
+      {loading && <p className="mt-4 text-sm text-muted-foreground">{t("common.loading")}</p>}
       {nextCursor && !loading && (
         <div className="mt-4 flex justify-center">
-          <Button variant="outline" size="sm" onClick={() => load(nextCursor)}>Load more</Button>
+          <Button variant="outline" size="sm" onClick={() => load(nextCursor)}>{t("common.loadMore")}</Button>
         </div>
       )}
     </div>
@@ -95,8 +96,8 @@ function ChannelRow({ channel, onDelete }: { channel: AdminChannel; onDelete: ()
         {channel.created_at ? new Date(channel.created_at).toLocaleString() : "—"}
       </td>
       <td className="px-4 py-2 text-right">
-        <Button variant="ghost" size="sm" onClick={() => setMessagesOpen(true)}>Messages</Button>
-        <Button variant="ghost" size="sm" className="text-destructive" onClick={onDelete}>Delete</Button>
+        <Button variant="ghost" size="sm" onClick={() => setMessagesOpen(true)}>{t("admin.ch.messages")}</Button>
+        <Button variant="ghost" size="sm" className="text-destructive" onClick={onDelete}>{t("common.delete")}</Button>
       </td>
       {messagesOpen && <ChannelMessagesDialog channelId={channel.id} onClose={() => setMessagesOpen(false)} />}
     </tr>
@@ -132,7 +133,7 @@ function ChannelMessagesDialog({ channelId, onClose }: { channelId: string; onCl
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Channel Messages</DialogTitle>
+          <DialogTitle>{t("admin.ch.msgTitle")}</DialogTitle>
         </DialogHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <ScrollArea className="max-h-[400px] rounded-md border">
@@ -147,13 +148,13 @@ function ChannelMessagesDialog({ channelId, onClose }: { channelId: string; onCl
               </div>
             ))}
             {messages.length === 0 && !loading && (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">No messages</p>
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">{t("admin.ch.noMsgs")}</p>
             )}
           </div>
         </ScrollArea>
-        {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+        {loading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {nextCursor && !loading && (
-          <Button variant="outline" size="sm" className="w-full" onClick={() => load(nextCursor)}>Load more</Button>
+          <Button variant="outline" size="sm" className="w-full" onClick={() => load(nextCursor)}>{t("common.loadMore")}</Button>
         )}
       </DialogContent>
     </Dialog>

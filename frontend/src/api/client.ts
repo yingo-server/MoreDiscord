@@ -1,3 +1,4 @@
+import { t } from "@/i18n"
 type Method = "GET" | "POST" | "PATCH" | "DELETE"
 
 const BASE = "/api/v1"
@@ -53,7 +54,7 @@ class ApiClient {
           window.dispatchEvent(new CustomEvent("yingo:logout"))
           window.dispatchEvent(
             new CustomEvent("yingo:toast", {
-              detail: { message: "Session expired, please log in again", type: "error" },
+              detail: { message: t("auth.login.sessionExpired"), type: "error" },
             })
           )
         }

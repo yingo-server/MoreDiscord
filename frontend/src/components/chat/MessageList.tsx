@@ -4,8 +4,10 @@ import { useRoomStore } from "@/stores/useRoomStore"
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { MessageItem } from "./MessageItem"
 import { Skeleton } from "@/components/ui/skeleton"
+import { t } from "@/i18n"
+import type { ConversationMember } from "@/types/models"
 
-export function MessageList() {
+export function MessageList({ members = [] }: { members?: ConversationMember[] }) {
   const currentConvId = useRoomStore((s) => s.currentRoomId)
   const { messages, hasMore, loading, fetchMessages, fetchMore } = useMessageStore()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -80,10 +82,10 @@ export function MessageList() {
         {hasMore && <div ref={setObserver} className="h-1" />}
         <div className="flex flex-col">
           {messages.map((msg) => (
-            <MessageItem key={msg.id} message={msg} />
+            <MessageItem key={msg.id} message={msg} sender={members.find((m) => m.user_id === msg.sender_id)} />
           ))}
           {messages.length === 0 && !loading && (
-            <div className="py-10 text-center text-xs text-muted-foreground">No messages yet</div>
+            <div className="py-10 text-center text-xs text-muted-foreground">{t("list.empty")}</div>
           )}
         </div>
       </div>

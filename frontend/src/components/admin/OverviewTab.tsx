@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { getStatsOverview, type AdminStatsOverview } from "@/api/admin"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { t } from "@/i18n"
 
 export function OverviewTab() {
   const [stats, setStats] = useState<AdminStatsOverview | null>(null)
@@ -39,7 +40,7 @@ export function OverviewTab() {
         </Card>
       ))}
       {stats && entries.length === 0 && (
-        <p className="text-sm text-muted-foreground">No stats returned by the server.</p>
+        <p className="text-sm text-muted-foreground">{t("admin.overview.noStats")}</p>
       )}
     </div>
   )

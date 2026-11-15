@@ -11,6 +11,8 @@ import { CreateRoom } from "@/components/rooms/CreateRoom"
 import { RoomContextMenu } from "@/components/rooms/RoomContextMenu"
 import { RoomDialogs } from "@/components/rooms/RoomDialogs"
 import { cn } from "@/lib/utils"
+import { formatDisplayName } from "@/lib/displayName"
+import { t } from "@/i18n"
 import type { Conversation } from "@/types/models"
 
 interface MenuState {
@@ -36,7 +38,7 @@ export function Sidebar() {
 
   const filtered = search
     ? rooms.filter((r) => {
-        const name = r.type === "group" ? (r.name || "") : (r.peer ? `${r.peer.display_name} ${r.peer.username}` : "")
+        const name = r.type === "group" ? (r.name || "") : (r.peer ? formatDisplayName(r.peer) : "")
         return name.toLowerCase().includes(search.toLowerCase())
       })
     : rooms
@@ -71,13 +73,13 @@ export function Sidebar() {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search conversations..."
+              placeholder={t("sidebar.search")}
               className="pl-8 h-8 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCreate(true)} aria-label="New conversation">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCreate(true)} aria-label={t("sidebar.newConv")}>
             <MessageSquarePlus className="h-4 w-4" />
           </Button>
         </div>
@@ -85,8 +87,8 @@ export function Sidebar() {
         <ScrollArea className="flex-1">
           {fetchError ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center text-sm">
-              <p className="text-destructive">Failed to load conversations</p>
-              <Button variant="outline" size="sm" onClick={() => fetchRooms()}>Retry</Button>
+              <p className="text-destructive">{t("sidebar.loadFailed")}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchRooms()}>{t("common.retry")}</Button>
             </div>
           ) : (
             <div className="flex flex-col gap-0.5 p-2">
@@ -107,7 +109,7 @@ export function Sidebar() {
               ))}
               {filtered.length === 0 && (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  {search ? "No conversations found" : "No conversations yet"}
+                  {search ? t("sidebar.noResults") : t("sidebar.empty")}
                 </div>
               )}
             </div>
@@ -124,13 +126,13 @@ export function Sidebar() {
           onClose={() => setMenu(null)}
           items={[
             {
-              label: menu.room.type === "group" ? "Rename Group" : "Properties",
+              label: menu.room.type === "group" ? t("sidebar.renameGroup") : t("sidebar.properties"),
               onClick: () => {
                 if (menu.room.type === "group") setRenameTarget(menu.room)
               },
             },
             {
-              label: menu.room.type === "direct" ? "Delete Conversation" : "Leave Group",
+              label: menu.room.type === "direct" ? t("sidebar.deleteConv") : t("sidebar.leaveGroup"),
               danger: true,
               onClick: () => setDeleteTarget(menu.room),
             },

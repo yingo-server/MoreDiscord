@@ -2,6 +2,7 @@ import { useRef } from "react"
 import type { Conversation } from "@/types/models"
 import { conversationTitle } from "@/types/models"
 import { cn, timeAgo } from "@/lib/utils"
+import { t } from "@/i18n"
 
 interface RoomItemProps {
   room: Conversation
@@ -34,7 +35,7 @@ export function RoomItem({ room, active, onClick }: RoomItemProps) {
       <div className="flex-1 overflow-hidden">
         <div className="truncate font-medium">{name}</div>
         <div className="truncate text-xs text-muted-foreground">
-          {room.last_message || (room.type === "group" ? "Group" : "Direct message")}
+          {room.last_message || (room.type === "group" ? t("room.create.group") : t("chat.select"))}
         </div>
       </div>
       <div className="flex items-center gap-2">

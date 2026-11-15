@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast"
 import { Shield, User } from "lucide-react"
+import { formatDisplayName } from "@/lib/displayName"
+import { t } from "@/i18n"
 
 export default function ProfilePage() {
   const user = useAuthStore((s) => s.user)
@@ -31,9 +33,9 @@ export default function ProfilePage() {
     try {
       await userApi.updateProfile(displayName.trim())
       await fetchMe()
-      addToast("Profile updated", "success")
+      addToast(t("profile.updated"), "success")
     } catch (e: unknown) {
-      addToast((e as Error)?.message || "Save failed", "error")
+      addToast((e as Error)?.message || t("profile.saveFailed"), "error")
     } finally {
       setSaving(false)
     }
@@ -44,15 +46,15 @@ export default function ProfilePage() {
       <Card className="w-full max-w-md">
         <CardHeader className="flex flex-row items-center gap-4">
           <Avatar className="h-16 w-16">
-            <AvatarFallback className="text-xl">{(user.display_name || user.username).slice(0, 2).toUpperCase()}</AvatarFallback>
+            <AvatarFallback className="text-xl">{formatDisplayName(user).slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-xl">{user.display_name || user.username}</CardTitle>
+            <CardTitle className="text-xl">{formatDisplayName(user)}</CardTitle>
             <div className="flex items-center gap-2">
               {user.admin === 1 && (
                 <Badge>
                   <Shield className="mr-1 h-3 w-3" />
-                  Admin
+                  {t("profile.admin")}
                 </Badge>
               )}
               <Badge variant="outline">@{user.username}</Badge>
@@ -63,11 +65,12 @@ export default function ProfilePage() {
         <CardContent className="space-y-4 pt-4">
           <div className="flex items-center gap-2 text-sm">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Email:</span>
+            <span className="text-muted-foreground">{t("profile.email")}:</span>
             <span className="truncate">{user.email}</span>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="display_name">Display name</Label>
+            <Label htmlFor="display_name">{t("profile.displayName")}</Label>
+            <p className="text-xs text-muted-foreground">{t("profile.displayHint")}</p>
             <div className="flex gap-2">
               <Input
                 id="display_name"
@@ -76,7 +79,7 @@ export default function ProfilePage() {
                 onChange={(e) => setDisplayName(e.target.value)}
               />
               <Button onClick={handleSave} disabled={saving || !displayName.trim()}>
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("common.saving") : t("common.save")}
               </Button>
             </div>
           </div>

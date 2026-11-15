@@ -1,14 +1,17 @@
 import type { Message } from "@/types/models"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { cn, timeAgo, timeFull } from "@/lib/utils"
+import { formatDisplayName, type DisplayableUser } from "@/lib/displayName"
 
 interface MessageItemProps {
   message: Message
+  sender?: DisplayableUser | null
 }
 
-export function MessageItem({ message }: MessageItemProps) {
+export function MessageItem({ message, sender }: MessageItemProps) {
   const user = useAuthStore((s) => s.user)
   const isOwn = message.sender_id === user?.id
+  const author: DisplayableUser | null = sender || (isOwn ? user : null)
   const initials = message.sender_id?.slice(0, 2).toUpperCase() || "?"
 
   return (
@@ -18,7 +21,7 @@ export function MessageItem({ message }: MessageItemProps) {
       </div>
       <div className={cn("flex max-w-[70%] flex-col gap-0.5", isOwn && "items-end")}>
         <div className="flex items-baseline gap-2">
-          <span className="text-xs font-medium">{message.sender_id}</span>
+          <span className="text-xs font-medium">{author ? formatDisplayName(author) : message.sender_id}</span>
           <span className="text-[10px] text-muted-foreground" title={timeFull(new Date(message.created_at).getTime())}>
             {timeAgo(new Date(message.created_at).getTime())}
           </span>

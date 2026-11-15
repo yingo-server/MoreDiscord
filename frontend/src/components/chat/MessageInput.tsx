@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import * as chatApi from "@/api/chat"
+import { t } from "@/i18n"
 
 const MAX_LEN = 4000
 
@@ -31,7 +32,7 @@ export function MessageInput() {
     const content = text.trim()
     if (!content || !currentConvId || sending) return
     if (content.length > MAX_LEN) {
-      addToast(`Message too long (max ${MAX_LEN} characters)`, "error")
+      addToast(t("input.tooLong", { n: MAX_LEN }), "error")
       return
     }
     setText("")
@@ -41,7 +42,7 @@ export function MessageInput() {
       useMessageStore.getState().appendMessage(msg)
     } catch (e: unknown) {
       setText(content)
-      addToast((e as Error)?.message || "Message failed to send", "error")
+      addToast((e as Error)?.message || t("input.sendFailed"), "error")
     } finally {
       setSending(false)
     }
@@ -63,12 +64,12 @@ export function MessageInput() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type a message..."
+        placeholder={t("input.placeholder")}
         maxLength={MAX_LEN}
         className="flex-1 resize-none min-h-[40px] max-h-[120px]"
         rows={1}
       />
-      <Button size="icon" onClick={handleSend} disabled={!text.trim() || sending} className="mb-1" aria-label="Send message">
+      <Button size="icon" onClick={handleSend} disabled={!text.trim() || sending} className="mb-1" aria-label={t("input.send")}>
         <Send className="h-4 w-4" />
       </Button>
     </div>

@@ -7,6 +7,7 @@ import { MessageInput } from "@/components/chat/MessageInput"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { conversationTitle } from "@/types/models"
+import { t } from "@/i18n"
 import * as chatApi from "@/api/chat"
 import type { ConversationDetail } from "@/types/models"
 
@@ -56,21 +57,21 @@ export default function ChatPage() {
     if (fetchError) {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-          <p className="text-sm text-destructive">Failed to load conversations</p>
-          <Button variant="outline" size="sm" onClick={() => useRoomStore.getState().fetchRooms()}>Retry</Button>
+          <p className="text-sm text-destructive">{t("sidebar.loadFailed")}</p>
+          <Button variant="outline" size="sm" onClick={() => useRoomStore.getState().fetchRooms()}>{t("common.retry")}</Button>
         </div>
       )
     }
     if (rooms.length > 0) {
       return (
         <div className="flex h-full items-center justify-center p-4">
-          <p className="text-sm text-muted-foreground">Conversation not found or you don&apos;t have access</p>
+          <p className="text-sm text-muted-foreground">{t("chat.notFound")}</p>
         </div>
       )
     }
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">Select a conversation to start chatting</p>
+        <p className="text-sm text-muted-foreground">{t("chat.select")}</p>
       </div>
     )
   }
@@ -85,18 +86,18 @@ export default function ChatPage() {
         <div className="min-w-0">
           <h2 className="truncate font-semibold">{title}</h2>
           {isGroup && room.name && detail && detail.my_role === "owner" && (
-            <p className="truncate text-xs text-muted-foreground">You own this group</p>
+            <p className="truncate text-xs text-muted-foreground">{t("chat.owner")}</p>
           )}
         </div>
         {isGroup && memberCount != null && (
-          <span className="text-xs text-muted-foreground">{memberCount} members</span>
+          <span className="text-xs text-muted-foreground">{t("chat.members", { n: memberCount })}</span>
         )}
         <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-          Live
+          {t("chat.live")}
         </span>
       </div>
-      <MessageList />
+      <MessageList members={detail?.members ?? []} />
       <MessageInput />
     </div>
   )

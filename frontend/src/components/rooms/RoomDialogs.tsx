@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/useAuthStore"
 import * as chatApi from "@/api/chat"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { t } from "@/i18n"
 
 interface RoomDialogsProps {
   /** conversation targeted for delete (direct) or leave (group) */
@@ -40,7 +41,7 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
       onClose()
       navigate("/")
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Operation failed")
+      setError((err as Error)?.message || t("room.dialog.operationFailed"))
     } finally {
       setDeleting(false)
     }
@@ -54,7 +55,7 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
       await rename(renameTarget.id, name.trim())
       onClose()
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Save failed")
+      setError((err as Error)?.message || t("profile.saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -65,18 +66,18 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { setError(""); if (!o) onClose() }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{isGroup ? "Leave Group" : "Delete Conversation"}</DialogTitle>
+            <DialogTitle>{isGroup ? t("sidebar.leaveGroup") : t("sidebar.deleteConv")}</DialogTitle>
             <DialogDescription>
               {isGroup
-                ? "You will leave this group. If you are the owner, transfer ownership first or the group will be deleted."
-                : "This permanently deletes the entire conversation for both sides. This cannot be undone."}
+                ? t("room.dialog.leaveDesc")
+                : t("room.dialog.deleteDesc")}
             </DialogDescription>
           </DialogHeader>
           {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={onClose} disabled={deleting}>Cancel</Button>
+            <Button variant="outline" onClick={onClose} disabled={deleting}>{t("common.cancel")}</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Working..." : isGroup ? "Leave" : "Delete"}
+              {deleting ? t("common.working") : isGroup ? t("common.leave") : t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -85,21 +86,21 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
       <Dialog key={renameTarget?.id ?? "rename-none"} open={!!renameTarget} onOpenChange={(o) => { setError(""); if (!o) onClose() }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Rename Group</DialogTitle>
-            <DialogDescription>Only group conversations can be renamed.</DialogDescription>
+            <DialogTitle>{t("sidebar.renameGroup")}</DialogTitle>
+            <DialogDescription>{t("room.dialog.renameDesc")}</DialogDescription>
           </DialogHeader>
           {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
           <input
             autoFocus
             maxLength={64}
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-            placeholder="group name..."
+            placeholder={t("room.dialog.namePlaceholder")}
             defaultValue={renameTarget?.name ?? ""}
             onChange={(e) => setName(e.target.value)}
           />
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button onClick={handleRename} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+            <Button variant="outline" onClick={onClose} disabled={saving}>{t("common.cancel")}</Button>
+            <Button onClick={handleRename} disabled={saving}>{saving ? t("common.saving") : t("common.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
