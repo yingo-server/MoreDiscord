@@ -65,8 +65,7 @@ export default function AdminPage() {
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <ShieldAlert className="h-10 w-10 text-muted-foreground" />
         <p className="text-lg font-medium">{t("admin.denied")}</p>
-        <p className="text-sm text-muted-foreground">{t("admin.deniedDesc")}</p>
-      </div>
+              </div>
     )
   }
 
@@ -84,8 +83,7 @@ export default function AdminPage() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b px-6 py-4">
         <h1 className="text-xl font-semibold">{t("admin.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("admin.subtitle")}</p>
-      </div>
+              </div>
       <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
         <TabsList className="mx-6 mt-4 w-fit">
           <TabsTrigger value="overview">{t("admin.tab.overview")}</TabsTrigger>

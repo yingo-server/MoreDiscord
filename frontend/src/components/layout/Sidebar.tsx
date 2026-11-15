@@ -109,7 +109,7 @@ export function Sidebar() {
               ))}
               {filtered.length === 0 && (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  {search ? t("sidebar.noResults") : t("sidebar.empty")}
+                  {search ? t("sidebar.noResults") : null}
                 </div>
               )}
             </div>

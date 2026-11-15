@@ -84,9 +84,6 @@ export function MessageList({ members = [] }: { members?: ConversationMember[] }
           {messages.map((msg) => (
             <MessageItem key={msg.id} message={msg} sender={members.find((m) => m.user_id === msg.sender_id)} />
           ))}
-          {messages.length === 0 && !loading && (
-            <div className="py-10 text-center text-xs text-muted-foreground">{t("list.empty")}</div>
-          )}
         </div>
       </div>
     </div>

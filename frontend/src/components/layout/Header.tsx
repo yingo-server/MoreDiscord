@@ -93,8 +93,7 @@ export function Header() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{t("header.aboutTitle")}</DialogTitle>
-            <DialogDescription>{t("header.aboutDesc")}</DialogDescription>
-          </DialogHeader>
+                      </DialogHeader>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between gap-4">
               <span className="text-muted-foreground">{t("common.version")}</span>

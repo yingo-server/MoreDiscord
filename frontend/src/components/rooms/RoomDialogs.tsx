@@ -87,8 +87,7 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("sidebar.renameGroup")}</DialogTitle>
-            <DialogDescription>{t("room.dialog.renameDesc")}</DialogDescription>
-          </DialogHeader>
+                      </DialogHeader>
           {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
           <input
             autoFocus

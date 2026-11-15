@@ -44,8 +44,7 @@ export function LoginForm() {
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">{t("auth.login.title")}</CardTitle>
-        <CardDescription>{t("auth.login.subtitle")}</CardDescription>
-      </CardHeader>
+              </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}

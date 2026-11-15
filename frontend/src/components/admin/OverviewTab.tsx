@@ -39,9 +39,6 @@ export function OverviewTab() {
           </CardContent>
         </Card>
       ))}
-      {stats && entries.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t("admin.overview.noStats")}</p>
-      )}
     </div>
   )
 }

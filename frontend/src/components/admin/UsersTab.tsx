@@ -78,7 +78,6 @@ export function UsersTab() {
             ))}
             {users.length === 0 && !loading && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">{t("admin.users.empty")}</td>
               </tr>
             )}
           </tbody>

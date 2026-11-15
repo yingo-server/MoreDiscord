@@ -71,7 +71,7 @@ export default function ChatPage() {
     }
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">{t("chat.select")}</p>
+        
       </div>
     )
   }
@@ -85,9 +85,6 @@ export default function ChatPage() {
       <div className="flex items-center gap-3 border-b px-4 py-2">
         <div className="min-w-0">
           <h2 className="truncate font-semibold">{title}</h2>
-          {isGroup && room.name && detail && detail.my_role === "owner" && (
-            <p className="truncate text-xs text-muted-foreground">{t("chat.owner")}</p>
-          )}
         </div>
         {isGroup && memberCount != null && (
           <span className="text-xs text-muted-foreground">{t("chat.members", { n: memberCount })}</span>

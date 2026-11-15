@@ -131,8 +131,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("room.create.title")}</DialogTitle>
-          <DialogDescription>{t("room.create.desc")}</DialogDescription>
-        </DialogHeader>
+                  </DialogHeader>
         {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full">
@@ -164,9 +163,6 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
                     </button>
                   ))}
                 </div>
-              )}
-              {!searching && searchQuery.length >= 1 && results.length === 0 && !selectedUser && (
-                <p className="text-xs text-muted-foreground">{t("room.create.noUsers")}</p>
               )}
               {selectedUser && (
                 <p className="text-xs text-green-600">{t("room.create.selected", { name: formatDisplayName(selectedUser) })}</p>

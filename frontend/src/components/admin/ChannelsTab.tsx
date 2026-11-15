@@ -66,7 +66,6 @@ export function ChannelsTab({ onRequestConfirm }: Props) {
             ))}
             {channels.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{t("admin.ch.empty")}</td>
               </tr>
             )}
           </tbody>

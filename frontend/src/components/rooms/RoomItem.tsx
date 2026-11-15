@@ -35,7 +35,7 @@ export function RoomItem({ room, active, onClick }: RoomItemProps) {
       <div className="flex-1 overflow-hidden">
         <div className="truncate font-medium">{name}</div>
         <div className="truncate text-xs text-muted-foreground">
-          {room.last_message || (room.type === "group" ? t("room.create.group") : t("chat.select"))}
+          {room.last_message || (room.type === "group" ? t("room.create.group") : null)}
         </div>
       </div>
       <div className="flex items-center gap-2">
