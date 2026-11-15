@@ -18,6 +18,13 @@ jobs:
           deno check api.ts
           for f in contracts/*.ts platform/*.ts domain/*.ts handlers/*.ts; do deno check "$f"; done
 
+  emoji:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 禁止 emoji
+        run: python3 tool/check_emoji.py .
+
   frontend-check:
     runs-on: ubuntu-latest
     steps:

@@ -85,8 +85,8 @@
 
 ## 3. 事务 — PASS 6 / 问题 5
 
-**PASS-3.1** 显式 `BEGIN`/`COMMIT`/`ROLLBACK`（`db.ts:183,185,191`）✓
-**PASS-3.2** baton 维护：每次 `execRaw` 后 `baton = json.baton`（`:163`），请求体携带（`:155`）；成功 `:186`、异常 `:193` 两条路径均 `closeTx`（`:198–205`，`{type:"close"}`）✓
+**PASS-3.1** 显式 `BEGIN`/`COMMIT`/`ROLLBACK`（`db.ts:183,185,191`）
+**PASS-3.2** baton 维护：每次 `execRaw` 后 `baton = json.baton`（`:163`），请求体携带（`:155`）；成功 `:186`、异常 `:193` 两条路径均 `closeTx`（`:198–205`，`{type:"close"}`）
 **PASS-3.3 · `toArg` 编码** `:112–118`：null→`{type:"null",value:null}`、integer/float→`{type,value:String(v)}`（Hrana 要求 integer 为字符串）、text→`String(v)`；`decodeVal`（`:30–45`）兼容 `{type,value}` 与 `{integer|float|text|blob|null}` 两种值编码。缺 blob/boolean 显式分支，本项目不传 → 低风险。
 **PASS-3.4 · `extractResult` 兼容真实 v2（但测试未覆盖）** `:58–60` 覆盖 `entry.response.result`（生产形状）、`entry.results`（mock 形状）、`entry.result`，错误取 `entry.error ?? r.error`；`decodeRows`（`:47–54`）兼容 `cols:[{name}]` 与字符串数组。**反面证据**：`interface TursoResult`（`:7–10`）声明的形状与真实 v2 不符；`smoke_test.ts:31,129,165,171,206,214` 全程 mock 成旧形状 → 真实 v2 包装的兼容路径**未覆盖**。
 **PASS-3.5 · 10 人上限在事务内 COUNT+INSERT** `conversations.ts:232–248` 在 `transaction` 内先 `SELECT COUNT(*)`（`:234`）≥10 抛 `GROUP_FULL`（`:236`）再 INSERT（`:243`）；`createGroup:181–182` 的上限校验在事务外，但 `memberIds` 为本请求内固定去重数组（`:179`），无并发可改变待插行数，等价安全。串行化缺陷另计 3.A。
@@ -135,8 +135,8 @@
 
 ## 5. 数据 — PASS 2 / 问题 6
 
-**PASS-5.1 · 规格 §4 的 3 条索引齐全**：`schema.sql:56–58` `idx_messages_conv_time`、`idx_members_user`、`idx_sessions_user` ✓
-**PASS-5.2 · `presence.ts lastSeenMap` 批量查询正确**：`:25–29` `WHERE revoked=0 AND user_id IN (?,...) GROUP BY user_id MAX(last_used_at)`；`:24` 只拼 `?` 个数、值全参数化；`:31` 过滤 `r.user_id && r.last_seen_at` 处理 NULL；调用方 `conversations.ts:80,127` 用 `?? null` 兜底缺失用户；`isOnline`（`:6–11`）对非法日期 `Number.isNaN` → false；`displayName.ts:19,33,50` 排序口径 `ORDER BY created_at ASC, id ASC` 与 `getTagByUser`（`:31–35`）复合比较一致 ✓
+**PASS-5.1 · 规格 §4 的 3 条索引齐全**：`schema.sql:56–58` `idx_messages_conv_time`、`idx_members_user`、`idx_sessions_user` 
+**PASS-5.2 · `presence.ts lastSeenMap` 批量查询正确**：`:25–29` `WHERE revoked=0 AND user_id IN (?,...) GROUP BY user_id MAX(last_used_at)`；`:24` 只拼 `?` 个数、值全参数化；`:31` 过滤 `r.user_id && r.last_seen_at` 处理 NULL；调用方 `conversations.ts:80,127` 用 `?? null` 兜底缺失用户；`isOnline`（`:6–11`）对非法日期 `Number.isNaN` → false；`displayName.ts:19,33,50` 排序口径 `ORDER BY created_at ASC, id ASC` 与 `getTagByUser`（`:31–35`）复合比较一致 
 
 **问题-5.A（致命）· `schema.sql` 缺 `users.admin` 列**
 依据：`schema.sql:5–11` 无 admin；`admin.ts` 7 处引用 → `no such column: admin`，全部 admin 端点 SQL 失败。
@@ -164,7 +164,7 @@
 依据：`ok()`/`fail()` 经 `withCors`（`response.ts:10,17`）；`preflight()`（`cors.ts:9–11`）；根 204（`api.ts:20` 直接 `headers: CORS`）；`failErr`（`response.ts:53–57` → `fail`）；`OPTIONS` 在 `:14` 认证前返回 204 免 token；`withCors`（`cors.ts:13–17`）重建保留 status/statusText/headers；CORS 常量（`:2–7`）与 §12 逐字段一致。§16.9 满足。
 
 **PASS-6.2 · 错误码→HTTP 映射表完整（表本身）**
-依据：`response.ts:24–41` 覆盖 §11 全部 16 个码，与 `api.md:7–24` 一致；`HttpError:49` 未知 code 兜底 500；`INTERNAL_ERROR` 未入表但 4 处均硬编码 500，口径一致；统一响应体 `{data,error}` ✓。
+依据：`response.ts:24–41` 覆盖 §11 全部 16 个码，与 `api.md:7–24` 一致；`HttpError:49` 未知 code 兜底 500；`INTERNAL_ERROR` 未入表但 4 处均硬编码 500，口径一致；统一响应体 `{data,error}` 。
 
 **问题-6.A（高）· Identity 错误未「全部翻译」为规格错误码**
 依据：`mapIdentityError:74` 对未识别 422（`User already registered`）返回 `INTERNAL_ERROR 500` 而非 `EMAIL_EXISTS 409`；`identityFetch:49` 未取 `error_code` 字段。正面：所有对外 message 均为网关自造串，**未透传 `{"msg":...}`**（§16.10 此点 PASS）。但「全部翻译」未达成。
@@ -179,9 +179,9 @@
 
 ## 7. 并发与边界 — PASS 4 / 问题 6
 
-**PASS-7.1 · 50 条分页**：`parseLimit`（`messages.ts:52–58`）与 `limitOf`（`admin.ts:18–24`）默认/上限 50，`<1`/NaN/Infinity → `INVALID_INPUT`，小数 floor ✓
-**PASS-7.2 · 复合游标**：`messages.ts:69` `(created_at,id)<(?,?)` / `:89` `>(?,?)`，ORDER BY 分别 DESC/ASC，命中 `idx_messages_conv_time`；首页哨兵 `9999-12-31T23:59:59.999Z` + `\uffff`（`:71`）、同步起点 `1970-01-01T00:00:00Z` + `""`（`:91`）与比较方向匹配 ✓
-**PASS-7.3 · `next_cursor` 语义**：`syncMessages:94–97` 有数据取末条游标、无数据返回传入的 `after`（或等价起点），**游标不倒退**，满足 §10.3「失败不推进」；`listMessages:74–76` 满页才给 `next_before`，`null` 表示到最早 ✓
+**PASS-7.1 · 50 条分页**：`parseLimit`（`messages.ts:52–58`）与 `limitOf`（`admin.ts:18–24`）默认/上限 50，`<1`/NaN/Infinity → `INVALID_INPUT`，小数 floor 
+**PASS-7.2 · 复合游标**：`messages.ts:69` `(created_at,id)<(?,?)` / `:89` `>(?,?)`，ORDER BY 分别 DESC/ASC，命中 `idx_messages_conv_time`；首页哨兵 `9999-12-31T23:59:59.999Z` + `\uffff`（`:71`）、同步起点 `1970-01-01T00:00:00Z` + `""`（`:91`）与比较方向匹配 
+**PASS-7.3 · `next_cursor` 语义**：`syncMessages:94–97` 有数据取末条游标、无数据返回传入的 `after`（或等价起点），**游标不倒退**，满足 §10.3「失败不推进」；`listMessages:74–76` 满页才给 `next_before`，`null` 表示到最早 
 **PASS-7.4 · 注入防护（全参数化）**：全库 SQL 模板插值仅 2 处 —— `presence.ts:24,27` 只拼 `?` 占位符个数、`admin.ts:33` 拼 LIKE 值但值走参数数组；`admin.ts:108` 的 `AND c.type=?` 亦参数化。`rg -n '\$\{' netlify/edge-functions/*.ts` 全量确认无 SQL 字符串拼接用户输入 → **无 SQL 注入**。`admin.ts:33` 的 `%`/`_` 未转义属通配符注入（见 7.D），非 SQL 注入。
 
 **问题-7.A（低）· 4000 字符口径不一致**
@@ -197,7 +197,7 @@
 依据：`admin.ts:33` `pattern = search ? '%'+search+'%' : '%'`，用户传 `%`/`_` 即改变搜索语义（参数化有效，非注入），`search` 仅 `.toLowerCase()`（`:31`）。
 
 **问题-7.E（中）· `display_name` 校验不统一；username/email 校验基本正确**
-依据：`user.ts:25–30` 只查 typeof/≤64，未 trim、未禁空串（触发 5.F）；`adminPatchUser:78–84` **完全无长度/空串校验**，可写任意超长值。`validateUsername`（`validate.ts:6–13`）3–32 `[a-z0-9_-]`+小写 ✓；`requireEmail`（`:40–46`）正则基本合规但未 trim/小写（GoTrue 侧规范化，users.email 快照存原值，同邮箱大小写变体可走到 2.C 的 500 分支）。`verify` 未本地校验 `type=recover` 时 password 必填（§7.2），依赖 GoTrue 兜底（低）。
+依据：`user.ts:25–30` 只查 typeof/≤64，未 trim、未禁空串（触发 5.F）；`adminPatchUser:78–84` **完全无长度/空串校验**，可写任意超长值。`validateUsername`（`validate.ts:6–13`）3–32 `[a-z0-9_-]`+小写 ；`requireEmail`（`:40–46`）正则基本合规但未 trim/小写（GoTrue 侧规范化，users.email 快照存原值，同邮箱大小写变体可走到 2.C 的 500 分支）。`verify` 未本地校验 `type=recover` 时 password 必填（§7.2），依赖 GoTrue 兜底（低）。
 
 **问题-7.F（低）· 无输入体量上限**
 依据：`strArray`（`validate.ts:48–53`）不限制数组长度，`createGroup:179` 先 `[...new Set(strArray(...))]` 再在 `:181` 判 >10 → 超大 memberIds 已先消耗 CPU/内存；`readJson`（`response.ts:59–66`）无 Content-Length 校验（平台 6MB 兜底）。

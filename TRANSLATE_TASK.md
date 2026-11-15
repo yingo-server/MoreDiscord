@@ -39,4 +39,4 @@
 
 ## 状态
 
-已完成。真实上游实测：`nah bro that was kinda mid tbh 💀` → `不是哥们，说实话那有点中二了 💀`。门禁：deno check / smoke 46/46 / 真库 9/9 / tsc 0 错误。
+已完成。真实上游实测：`nah bro that was kinda mid tbh ` → `不是哥们，说实话那有点中二了 `。门禁：deno check / smoke 46/46 / 真库 9/9 / tsc 0 错误。

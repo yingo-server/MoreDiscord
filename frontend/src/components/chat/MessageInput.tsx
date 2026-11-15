@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from "react"
-import { Send } from "lucide-react"
+import { Send, Languages } from "lucide-react"
 import { useRoomStore } from "@/stores/useRoomStore"
 import { useMessageStore } from "@/stores/useMessageStore"
 import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import * as chatApi from "@/api/chat"
-import { t } from "@/i18n"
+import { translateMessage } from "@/api/translate"
+import { needsTranslation } from "@/lib/lang"
+import { t, getLang } from "@/i18n"
 
 const MAX_LEN = 4000
 
@@ -15,7 +17,10 @@ export function MessageInput() {
   const { addToast } = useToast()
   const [text, setText] = useState("")
   const [sending, setSending] = useState(false)
+  const [translating, setTranslating] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const showTranslate = needsTranslation(text, getLang())
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -27,6 +32,19 @@ export function MessageInput() {
   useEffect(() => {
     textareaRef.current?.focus()
   }, [currentConvId])
+
+  const handleTranslate = async () => {
+    if (translating || !text.trim()) return
+    setTranslating(true)
+    try {
+      const r = await translateMessage(text.trim(), getLang())
+      setText(r.translation)
+    } catch (e: unknown) {
+      addToast((e as Error)?.message || t("msg.translateFailed"), "error")
+    } finally {
+      setTranslating(false)
+    }
+  }
 
   const handleSend = async () => {
     const content = text.trim()
@@ -58,20 +76,35 @@ export function MessageInput() {
   if (!currentConvId) return null
 
   return (
-    <div className="flex items-end gap-2 border-t px-4 py-3">
-      <Textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={t("input.placeholder")}
-        maxLength={MAX_LEN}
-        className="flex-1 resize-none min-h-[40px] max-h-[120px]"
-        rows={1}
-      />
-      <Button size="icon" onClick={handleSend} disabled={!text.trim() || sending} className="mb-1" aria-label={t("input.send")}>
-        <Send className="h-4 w-4" />
-      </Button>
+    <div className="border-t px-4 py-3">
+      <div className="flex items-end gap-2">
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={t("input.placeholder")}
+          maxLength={MAX_LEN}
+          className="flex-1 resize-none min-h-[40px] max-h-[120px]"
+          rows={1}
+        />
+        {showTranslate && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleTranslate}
+            disabled={translating}
+            className="mb-1 h-6 w-6 text-muted-foreground"
+            aria-label={t("msg.translate")}
+            title={t("msg.translate")}
+          >
+            <Languages className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        <Button size="icon" onClick={handleSend} disabled={!text.trim() || sending} className="mb-1" aria-label={t("input.send")}>
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   )
 }

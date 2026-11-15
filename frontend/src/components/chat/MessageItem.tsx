@@ -1,10 +1,7 @@
-import { useState } from "react"
 import type { Message } from "@/types/models"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { cn, timeAgo, timeFull } from "@/lib/utils"
 import { formatDisplayName, type DisplayableUser } from "@/lib/displayName"
-import { t, getLang } from "@/i18n"
-import { translateMessage } from "@/api/translate"
 
 interface MessageItemProps {
   message: Message
@@ -16,24 +13,6 @@ export function MessageItem({ message, sender }: MessageItemProps) {
   const isOwn = message.sender_id === user?.id
   const author: DisplayableUser | null = sender || (isOwn ? user : null)
   const initials = message.sender_id?.slice(0, 2).toUpperCase() || "?"
-
-  const [translation, setTranslation] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
-
-  async function onTranslate() {
-    if (busy || translation) return
-    setBusy(true)
-    setFailed(false)
-    try {
-      const r = await translateMessage(message.content, getLang())
-      setTranslation(r.translation)
-    } catch {
-      setFailed(true)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div className={cn("flex gap-3 px-4 py-1.5 hover:bg-muted/30", isOwn && "flex-row-reverse")}>
@@ -55,25 +34,6 @@ export function MessageItem({ message, sender }: MessageItemProps) {
         >
           {message.content}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
-            onClick={onTranslate}
-            disabled={busy || !!translation}
-          >
-            {busy ? t("msg.translating") : translation ? "" : t("msg.translate")}
-          </button>
-          {failed && <span className="text-[11px] text-destructive">{t("msg.translateFailed")}</span>}
-        </div>
-        {translation && (
-          <div className={cn(
-            "self-start rounded-lg border-l-2 border-primary/50 px-3 py-1.5 text-sm whitespace-pre-wrap break-words text-muted-foreground",
-            isOwn && "self-end"
-          )}>
-            {translation}
-          </div>
-        )}
       </div>
     </div>
   )
