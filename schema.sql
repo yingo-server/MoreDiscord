@@ -7,6 +7,7 @@ CREATE TABLE users (
   username     TEXT UNIQUE NOT NULL,
   display_name TEXT,
   email        TEXT,
+  admin        INTEGER NOT NULL DEFAULT 0,   -- 1 = 管理员（/admin/* 门禁）
   created_at   TEXT NOT NULL
 );
 
@@ -56,3 +57,16 @@ CREATE TABLE sessions (
 CREATE INDEX idx_messages_conv_time ON messages(conversation_id, created_at, id);
 CREATE INDEX idx_members_user       ON conversation_members(user_id);
 CREATE INDEX idx_sessions_user      ON sessions(user_id);
+
+-- 管理操作审计日志（/admin/* 端点写入）
+CREATE TABLE audit_log (
+  id          TEXT PRIMARY KEY,
+  actor_id    TEXT NOT NULL,
+  action      TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id   TEXT NOT NULL,
+  detail      TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  FOREIGN KEY (actor_id) REFERENCES users(id)
+);
+CREATE INDEX idx_audit_log_time     ON audit_log(created_at, id);
