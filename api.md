@@ -225,12 +225,12 @@ Query：`after=<游标>`（首次可省略=从最早开始）、`limit=1..50`
 ```
 
 ### GET /admin/users — 用户分页/搜索
-Query：`search=<用户名子串>`（可选）、`cursor=<username>`（可选）、`limit=1..50`
+Query：`search=<用户名子串>`（可选）、`cursor=<Base64URL(username|id)>`（可选）、`limit=1..50`
 响应：
 ```json
 { "data": { "users": [ { "id": "...", "username": "...", "display_name": "...",
-                         "email": "...", "created_at": "ISO", "admin": 0|1 } ],
-            "next_cursor": "username|null" }, "error": null }
+                         "email": "...", "created_at": "ISO", "admin": 0|1, "tag": 1 } ],
+            "next_cursor": "Base64URL 游标|null" }, "error": null }
 ```
 
 ### GET /admin/users/:id — 用户详情
@@ -248,7 +248,7 @@ Query：`cursor`（可选）、`type=direct|group`（可选）、`limit`
 ```json
 { "data": { "channels": [ { "id", "type", "name", "created_by", "created_at",
                             "updated_at", "member_count" } ],
-            "next_cursor": "created_at|id 编码|null" }, "error": null }
+            "next_cursor": "Base64URL(created_at|id) 游标|null" }, "error": null }
 ```
 
 ### DELETE /admin/channels/:id — 强制解散（保留 messages）

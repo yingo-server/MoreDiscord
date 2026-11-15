@@ -171,6 +171,7 @@ async function transactionRun<T>(
     return decodeRows(r.rows, r.cols);
   };
 
+  let committed = false;
   try {
     const tx = {
       get: async (sql: string, params: any[] = []) => (await exec({ sql, args: params.map(toArg) }))[0] ?? null,
@@ -180,18 +181,30 @@ async function transactionRun<T>(
       },
     };
     // 显式开启事务（baton 串行下语句默认 autocommit，必须 BEGIN）
-    await exec({ sql: "BEGIN", args: [] });
+    // write → BEGIN IMMEDIATE：立刻拿写锁，避免并发下 deferred 升级导致的 SQLITE_BUSY/重复写入
+    // read  → BEGIN：默认 deferred 读事务
+    await exec({ sql: mode === "write" ? "BEGIN IMMEDIATE" : "BEGIN", args: [] });
     const returnValue = await fn(tx);
-    await exec({ sql: "COMMIT", args: [] });
-    await closeTx(baton, authHeaders);
+    // COMMIT 单独分支：COMMIT 失败时事务状态不确定（可能已在服务端生效），
+    // 不能像普通语句失败那样盲目重试/回滚——交由上层感知错误
+    try {
+      await exec({ sql: "COMMIT", args: [] });
+      committed = true;
+    } catch (commitErr) {
+      throw commitErr;
+    }
     return returnValue;
   } catch (e) {
-    // 出错时回滚并 close（规格 §16.1）
-    try {
-      await exec({ sql: "ROLLBACK", args: [] });
-    } catch { /* 忽略 */ }
-    await closeTx(baton, authHeaders);
+    // 仅未提交时回滚；已提交（或 COMMIT 后状态未知）不回滚，避免误删已生效写入（规格 §16.1）
+    if (!committed) {
+      try {
+        await exec({ sql: "ROLLBACK", args: [] });
+      } catch { /* 忽略 */ }
+    }
     throw e;
+  } finally {
+    // close 必须执行，否则 baton 泄漏到连接池
+    await closeTx(baton, authHeaders);
   }
 }
 

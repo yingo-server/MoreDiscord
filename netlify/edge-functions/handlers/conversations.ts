@@ -48,39 +48,61 @@ export async function listConversations(ctx: Ctx): Promise<Response> {
     [userId],
   );
 
-  // 一次性收集所有会话成员（本就要查，缓存复用，不额外增加往返），再批量取最后在线
+  // B3: 两次批量查询替代每会话一次的 N+1（成员 + 用户信息均 IN 批量取回，JS 端关联）
+  const convIds = rows.map((r) => r.id as string);
   const membersByConv = new Map<string, Record<string, any>[]>();
-  const allMemberIds: string[] = [];
-  for (const r of rows) {
+  if (convIds.length > 0) {
+    const ph = convIds.map(() => "?").join(",");
     const mem = await dbAll(
-      `SELECT cm.user_id, u.username, u.display_name
+      `SELECT cm.conversation_id, cm.user_id, u.username, u.display_name, u.created_at
        FROM conversation_members cm JOIN users u ON u.id=cm.user_id
-       WHERE cm.conversation_id=?`,
-      [r.id as string],
+       WHERE cm.conversation_id IN (${ph})`,
+      convIds,
     );
-    membersByConv.set(r.id as string, mem);
-    for (const m of mem) allMemberIds.push(m.user_id as string);
+    for (const m of mem) {
+      const key = m.conversation_id as string;
+      if (!membersByConv.has(key)) membersByConv.set(key, []);
+      membersByConv.get(key)!.push(m);
+    }
   }
+  const allMemberIds = [...membersByConv.values()].flat().map((m) => m.user_id as string);
   const seen = await lastSeenMap(dbAll as any, allMemberIds);
+
+  // 批量 tag：一次 SQL 取回相关显示名组内全部用户按序排列，JS 内算序号
+  const tagMap = new Map<string, number>();
+  {
+    const names = [...new Set(
+      [...membersByConv.values()].flat().map((m) => (m.display_name || m.username) as string),
+    )];
+    if (names.length > 0) {
+      const nph = names.map(() => "?").join(",");
+      const ordered = await dbAll(
+        `SELECT id, COALESCE(display_name, username) AS name FROM users
+         WHERE COALESCE(display_name, username) IN (${nph})
+         ORDER BY name ASC, created_at ASC, id ASC`,
+        names,
+      );
+      const counters = new Map<string, number>();
+      for (const r of ordered) {
+        const name = r.name as string;
+        const n = (counters.get(name) ?? 0) + 1;
+        counters.set(name, n);
+        tagMap.set(r.id as string, n);
+      }
+    }
+  }
 
   const out = [];
   for (const r of rows) {
     const members = membersByConv.get(r.id as string) ?? [];
     let peer: Record<string, any> | null = r.type === "direct" ? computePeer(members, userId) : null;
     if (peer) {
-      const full = await dbGet(
-        "SELECT id, username, display_name, created_at FROM users WHERE id=?",
-        [peer.id],
-      );
-      if (full) {
-        const { getTag } = await import("../_shared/displayName.ts");
-        peer = {
-          ...peer,
-          tag: await getTag(dbGet, full as any),
-          last_seen_at: seen.get(peer.id as string) ?? null,
-          online: isOnline(seen.get(peer.id as string)),
-        };
-      }
+      peer = {
+        ...peer,
+        tag: tagMap.get(peer.id as string) ?? 1,
+        last_seen_at: seen.get(peer.id as string) ?? null,
+        online: isOnline(seen.get(peer.id as string)),
+      };
     }
     out.push({
       id: r.id,
@@ -112,7 +134,8 @@ export async function getConversation(ctx: Ctx, id: string): Promise<Response> {
   );
   const my = members.find((m) => m.user_id === userId);
   const seen = await lastSeenMap(dbAll as any, members.map((m) => m.user_id as string));
-  const tagged = await attachTags(dbAll as any, members as any);
+  // B2: 详情查询返回的是 user_id 字段，attachTags 按 id 匹配 → 统一映射 id
+  const tagged = await attachTags(dbAll as any, members.map((m: any) => ({ ...m, id: m.user_id })) as any);
   return ok({
     id: conv.id,
     type: conv.type,
@@ -176,6 +199,7 @@ export async function createDirect(ctx: Ctx): Promise<Response> {
 export async function createGroup(ctx: Ctx): Promise<Response> {
   const userId = await requireUser(ctx.req);
   const name = validateGroupName(ctx.body.name);
+  // B11: 去重前先限长（strArray 内），再过滤自己
   const memberIds = [...new Set(strArray(ctx.body.memberIds ?? []))].filter((m) => m !== userId);
 
   const total = memberIds.length + 1;
@@ -273,6 +297,10 @@ export async function leaveConversation(ctx: Ctx, id: string): Promise<Response>
   const userId = await requireUser(ctx.req);
   const conv = await dbGet("SELECT type FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
+  // 规格 §4：私聊无管理操作（含 leave），拒绝以避免历史消息分裂（B1）
+  if (conv.type === "direct") {
+    throw new HttpError("NOT_A_GROUP", "cannot leave a direct conversation");
+  }
   const m = await requireMember(userId, id);
   if (conv.type === "group" && m.role === "owner") {
     throw new HttpError("OWNER_MUST_TRANSFER_OR_DELETE", "owner must transfer or delete the group before leaving");

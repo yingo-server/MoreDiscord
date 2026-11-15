@@ -1,8 +1,8 @@
 // handlers/auth.ts —— 注册/确认/登录/登出/找回/当前用户（规格 §7）
-import { resolveUserId, revokeSessionByRequest, createSession, identitySignup, identityPasswordToken, identityVerify, identityRecover, revokeAllUserSessions, reserveUsername, backfillUserId, compensateUser } from "../_shared/auth.ts";
+import { resolveUserId, revokeSessionByRequest, createSession, identitySignup, identityPasswordToken, identityVerify, identityRecover, revokeSessionsForUser, compensateUser } from "../_shared/auth.ts";
 import { ok, fail, HttpError, readJson } from "../_shared/response.ts";
 import { validateUsername, requireEmail, requireString, newId, nowIso } from "../_shared/validate.ts";
-import { get as dbGet, isUniqueViolation } from "../_shared/db.ts";
+import { get as dbGet, transaction, isUniqueViolation } from "../_shared/db.ts";
 
 interface Ctx {
   req: Request;
@@ -16,9 +16,15 @@ export async function signup({ req, body }: Ctx): Promise<Response> {
   const username = validateUsername(body.username);
 
   const tempId = newId();
+  // A10: 预留/回填/补偿纳入 write 事务（BEGIN IMMEDIATE），保证用户名预留到回填的原子性。
+  // 跨 Identity HTTP 调用不能放进 DB 事务——保留补偿 + 日志路径。
   try {
-    // 事务内预留用户名（规格 §16.1）
-    await reserveUsername(tempId, username, email);
+    await transaction("write", async (tx) => {
+      await tx.run(
+        "INSERT INTO users (id, username, email, created_at) VALUES (?,?,?,?)",
+        [tempId, username, email, nowIso()],
+      );
+    });
   } catch (e) {
     if (isUniqueViolation(e)) return fail("USERNAME_TAKEN", "username already taken", 409);
     throw e;
@@ -28,25 +34,48 @@ export async function signup({ req, body }: Ctx): Promise<Response> {
   let identityId: string | null = null;
   try {
     const r = await identitySignup(email, password);
-    identityId = r?.id ?? null;
+    identityId = r?.user?.id ?? r?.id ?? null;
     tokens = r?.access_token ? r : null; // Autoconfirm 时返回 token
   } catch (e) {
-    // Identity 失败：补偿删除预留行
+    // Identity 失败：补偿删除预留行（HTTP 调用不在 DB 事务内，用补偿保证一致性）
+    console.error("signup compensate: identity signup failed, deleting reserved row", { tempId, username });
     await compensateUser(tempId, username);
     if (e instanceof HttpError) return fail(e.code, e.message, e.status);
     throw e;
   }
 
   if (!identityId) {
+    console.error("signup compensate: identity returned no user id", { tempId, username });
     await compensateUser(tempId, username);
     return fail("INTERNAL_ERROR", "identity signup failed", 500);
   }
 
+  // 回填改主键：若临时行已被 FK 引用则 UPDATE 会失败，此时删除临时行并按 identityId 重新插入完整行，
+  // 再补偿删除任何残留（FK 未启用时 UPDATE 亦可成功——两种路径收敛到同一终态）
+  let backfilled = false;
   try {
-    await backfillUserId(tempId, username, identityId);
-  } catch {
-    await compensateUser(tempId, username);
-    return fail("INTERNAL_ERROR", "signup failed during backfill", 500);
+    await transaction("write", async (tx) => {
+      await tx.run("UPDATE users SET id=? WHERE username=? AND id=?", [identityId, username, tempId]);
+      const row = await tx.get("SELECT id FROM users WHERE id=?", [identityId]);
+      backfilled = !!row;
+    });
+  } catch (e) {
+    console.error("signup backfill error, falling back to re-insert", { tempId, username, identityId, err: String(e) });
+  }
+  if (!backfilled) {
+    try {
+      await transaction("write", async (tx) => {
+        await tx.run("DELETE FROM users WHERE id=?", [tempId]);
+        const row = await tx.get("SELECT id FROM users WHERE id=?", [identityId]);
+        if (!row) {
+          await tx.run("INSERT INTO users (id, username, email, created_at) VALUES (?,?,?,?)", [identityId, username, email, nowIso()]);
+        }
+      });
+    } catch (e) {
+      console.error("signup re-insert failed, compensating", { tempId, username, identityId, err: String(e) });
+      await compensateUser(tempId, username);
+      return fail("INTERNAL_ERROR", "signup failed during backfill", 500);
+    }
   }
 
   if (tokens) {
@@ -63,6 +92,19 @@ export async function signup({ req, body }: Ctx): Promise<Response> {
     confirmation_required: true,
     user: { id: identityId, username, email },
   });
+}
+
+// A2: GoTrue /verify 返回 AccessTokenResponse：{access_token, refresh_token, expires_in, token_type, user:{id,...}}
+// 顶层无 id。user.id 优先，否则从 access_token JWT payload 的 sub 解析（login 同样使用）。
+export function userIdFromTokens(tokens: any): string | null {
+  const id = tokens?.user?.id ?? tokens?.id ?? null;
+  if (id) return String(id);
+  try {
+    const payload = JSON.parse(atobUrl(String(tokens?.access_token ?? "").split(".")[1]));
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // POST /api/v1/auth/verify
@@ -82,14 +124,12 @@ export async function verify({ body }: Ctx): Promise<Response> {
     throw e;
   }
 
-  const identityUser = tokens?.id ?? null;
+  const userId = userIdFromTokens(tokens);
 
-  // type=recover 成功后吊销旧会话（规格 §7.2 / §16.8）
-  if (type === "recover" && identityUser) {
-    await revokeAllUserSessions(identityUser);
+  // type=recover 成功后吊销旧会话（规格 §7.2 / §16.8）—— A2: 走事务版 revokeSessionsForUser
+  if (type === "recover" && userId) {
+    await revokeSessionsForUser(userId);
   }
-
-  const userId = identityUser;
   if (!userId || !tokens?.access_token) {
     return fail("INTERNAL_ERROR", "verification did not return a session", 500);
   }
@@ -119,14 +159,8 @@ export async function login({ body }: Ctx): Promise<Response> {
     throw e;
   }
 
-  // 从 access_token JWT payload 取 sub（Identity user.id）
-  let userId: string | null = null;
-  try {
-    const payload = JSON.parse(atobUrl(tokens.access_token.split(".")[1]));
-    userId = payload.sub ?? null;
-  } catch {
-    userId = null;
-  }
+  // 从 access_token JWT payload 取 sub（Identity user.id）—— A2: 统一走 userIdFromTokens
+  const userId = userIdFromTokens(tokens);
 
   if (!userId) return fail("INTERNAL_ERROR", "login failed to resolve user", 500);
 
@@ -173,7 +207,6 @@ export async function me({ req }: Ctx): Promise<Response> {
   const { getTag } = await import("../_shared/displayName.ts");
   const tag = await getTag(dbGet, row as any);
   return ok({ ...row, tag });
-  return ok(row);
 }
 
 export const handlers: Record<string, (ctx: Ctx) => Promise<Response>> = {

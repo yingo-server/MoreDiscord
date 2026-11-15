@@ -28,7 +28,7 @@ function match(sql: string, kw: string) {
   return new RegExp(kw.replace(/\s+/g, "\\s+").replace(/\(/g, "\\(").replace(/\)/g, "\\)"), "i").test(sql);
 }
 
-interface ExecuteResult { results?: { rows?: any[][]; cols?: string[] }; error?: { message?: string } }
+interface ExecuteResult { results?: { rows?: any[][]; cols?: string[] }; error?: { message?: string }; __debugRows?: number }
 
 // 极简 SQL 解释器：只覆盖本项目用到的模式
 function execStmt(sql: string, args: any[]): ExecuteResult {
@@ -71,13 +71,15 @@ function execStmt(sql: string, args: any[]): ExecuteResult {
     // JOIN 查询特判（本项目两种 JOIN 模式）
     if (/join/i.test(s)) {
       if (/from\s+conversation_members\s+cm\s+join\s+users/i.test(s)) {
-        // 成员列表 JOIN users
-        const cidArg = args[0];
-        const mems = tables.conversation_members.filter((m) => m.conversation_id === cidArg);
+        // 成员列表 JOIN users（B3 后支持 IN (...) 批量会话）
+        const cidArgs = /in\s*\(/i.test(s) ? args : [args[0]];
+        const mems = tables.conversation_members.filter((m) => cidArgs.includes(m.conversation_id));
         rows = mems.map((m) => ({
+          conversation_id: m.conversation_id,
           user_id: m.user_id,
           username: tables.users.find((u) => u.id === m.user_id)?.username ?? null,
           display_name: tables.users.find((u) => u.id === m.user_id)?.display_name ?? null,
+          created_at: tables.users.find((u) => u.id === m.user_id)?.created_at ?? null,
           role: m.role,
           joined_at: m.joined_at,
           last_read_at: m.last_read_at,
@@ -85,7 +87,7 @@ function execStmt(sql: string, args: any[]): ExecuteResult {
         rows = rows.filter((r) => r.user_id != null);
       } else if (/from\s+conversations\s+c\s+join/i.test(s)) {
         // direct 去重（两人共同 direct）或会话列表——用 SQL 形状区分
-        if (/where\s+c\.type\s*=\s*'direct'/i.test(s)) {
+        if (/join\s+conversation_members\s+a\s+on/i.test(s) || /where\s+c\.type\s*=\s*'direct'/i.test(s)) {
           const [uidA, uidB] = args;
           const convIds = new Set(
             tables.conversation_members
@@ -117,7 +119,7 @@ function execStmt(sql: string, args: any[]): ExecuteResult {
               unread_count: 0,
               peer: pu ? { id: pu.id, username: pu.username, display_name: pu.display_name } : null,
             };
-          }).filter(Boolean);
+          }).filter(Boolean) as Row[];
           if (Deno.env.get("DEBUG_MOCK")) console.log("  [mock list]", uidMe, myMembers.length, "convRows:", convRowsDebug.length);
           rows = convRowsDebug;
         }
@@ -322,7 +324,14 @@ const origFetch = globalThis.fetch;
     return Response.json({ id: `id-${body.email.split("@")[0]}`, access_token: mkJwt(`id-${body.email.split("@")[0]}`), refresh_token: "rfr", expires_in: 3600 });
   }
   if (path.endsWith("/verify")) {
-    return Response.json({ id: "id-bob", access_token: mkJwt("id-bob"), refresh_token: "rfr", expires_in: 3600 });
+    // A11: 真实 GoTrue /verify 返回 AccessTokenResponse 形状：顶层无 id，user.id 嵌套
+    return Response.json({
+      access_token: mkJwt("id-bob"),
+      token_type: "bearer",
+      expires_in: 3600,
+      refresh_token: "rfr",
+      user: { id: "id-bob", email: "bob@test.com", aud: "", role: "", email_confirmed_at: null, app_metadata: {}, user_metadata: {} },
+    });
   }
   if (path.endsWith("/recover")) return Response.json({});
   return new Response("{}", { status: 200 });
@@ -392,6 +401,15 @@ check("logout 后同 token 401", rAfterOut.status === 401);
 const rRe = await call("POST", "/auth/login", { body: { email: "alice@test.com", password: "Passw0rd!123" } });
 const aliceTok2 = rRe.json?.data?.session_token;
 
+// A11/A2: verify mock 已改为真实 AccessTokenResponse 形状（user.id 嵌套、顶层无 id），
+// 断言 verify 不再 500 且能正确解析 user.id 建会话
+const rVerify = await call("POST", "/auth/verify", { body: { type: "signup", token: "confirm-token" } });
+check("verify(AccessTokenResponse 形状) 200 非 500", rVerify.status === 200 && rVerify.json?.data?.session_token?.startsWith("sess_"), rVerify.json);
+check("verify 解析出 user.id=id-bob", rVerify.json?.data?.user?.id === "id-bob", rVerify.json);
+const rVerifyTok = rVerify.json?.data?.session_token;
+const rVerifyMe = await call("GET", "/auth/me", { token: rVerifyTok });
+check("verify 会话可用 /auth/me", rVerifyMe.status === 200, rVerifyMe.json);
+
 // 群聊：先注册 8 个真实用户（规格要求成员必须存在）
 const realIds: string[] = [];
 for (let i = 0; i < 9; i++) {
@@ -452,10 +470,11 @@ check("owner 直接退群 → OWNER_MUST_TRANSFER_OR_DELETE", rOwnerLeave.json?.
 const rTransfer = await call("POST", `/conversations/${gid}/transfer`, { token: aliceTok2, body: { userId: "id-bob" } });
 check("转让给非成员 → NOT_A_MEMBER", rTransfer.json?.error?.code === "NOT_A_MEMBER", rTransfer.json);
 // 先把 bob 加不进（满 10），用 direct conv 测 leave 权限链
+// B1（批次 B 已改 conversations.ts）：规格 §4 禁止私聊 leave → NOT_A_GROUP 400
 const rBobLeave = await call("POST", `/conversations/${convId}/leave`, { token: bobTok });
-check("bob 退私聊成功", rBobLeave.status === 200, rBobLeave.json);
+check("bob 退私聊 → NOT_A_GROUP（规格 §4 禁止私聊管理操作）", rBobLeave.status === 400 && rBobLeave.json?.error?.code === "NOT_A_GROUP", rBobLeave.json);
 const rBobRead = await call("GET", `/conversations/${convId}/messages`, { token: bobTok });
-check("退出后读消息 → 403/401", rBobRead.status !== 200, rBobRead.status);
+check("未退出的成员仍可读消息", rBobRead.status === 200, rBobRead.status);
 
 console.log("== user ==");
 const rUn = await call("PATCH", "/user/username", { token: aliceTok2, body: { username: "alice_new" } });

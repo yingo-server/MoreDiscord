@@ -1,7 +1,6 @@
 -- Turso 建表脚本（规格 §4 全量 SQL）
 -- 用 turso CLI 或 sqlite3 客户端执行：
 --   turso db shell <db-name> < schema.sql
-
 CREATE TABLE users (
   id           TEXT PRIMARY KEY,
   username     TEXT UNIQUE NOT NULL,
@@ -39,6 +38,7 @@ CREATE TABLE messages (
   created_at       TEXT NOT NULL,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id),
   FOREIGN KEY (sender_id)       REFERENCES users(id),
+  -- 口径注意：此处 SQLite length() 按 Unicode 码点计数，与 JS 端 [...content].length 一致
   CHECK (length(content) <= 4000)
 );
 
@@ -57,6 +57,12 @@ CREATE TABLE sessions (
 CREATE INDEX idx_messages_conv_time ON messages(conversation_id, created_at, id);
 CREATE INDEX idx_members_user       ON conversation_members(user_id);
 CREATE INDEX idx_sessions_user      ON sessions(user_id);
+
+-- B12: presence 读路径索引（sessions 按 revoked+user_id 过滤后 GROUP BY）
+CREATE INDEX idx_sessions_revoked_user ON sessions(revoked, user_id);
+-- B12: displayName tag 计算 / attachTags 走 COALESCE(display_name, username) 等值查询
+CREATE INDEX idx_users_display_name ON users(display_name);
+CREATE INDEX idx_users_username_created ON users(username, created_at, id);
 
 -- 管理操作审计日志（/admin/* 端点写入）
 CREATE TABLE audit_log (

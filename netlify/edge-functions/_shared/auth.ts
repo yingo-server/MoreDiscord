@@ -58,6 +58,15 @@ function mapIdentityError(json: any, status: number): HttpError {
     // GoTrue /token 要求 application/x-www-form-urlencoded，JSON 会被拒——这是网关侧的错
     return new HttpError("INTERNAL_ERROR", "identity token encoding error");
   }
+  // A4: GoTrue 登录未确认邮箱时同时携带 invalid_grant + "Email not confirmed"，
+  // 必须排在纯 invalid_grant 分支之前，否则 EMAIL_NOT_CONFIRMED 不可达
+  if ((msg.includes("invalid_grant") || msg.includes("invalid")) && (msg.includes("email not confirmed") || msg.includes("confirm"))) {
+    return new HttpError("EMAIL_NOT_CONFIRMED", "email not confirmed");
+  }
+  // A3: EMAIL_EXISTS → 409（含 error_code=email_exists / "user already registered" 等变体）
+  if (msg.includes("already registered") || msg.includes("email exists") || (json?.error_code ?? "").toLowerCase() === "email_exists" || (json?.code ?? "").toString() === "email_exists") {
+    return new HttpError("EMAIL_EXISTS", "email already registered");
+  }
   if (msg.includes("invalid_grant") || msg.includes("invalid email or password") || msg.includes("no user found") || msg.includes("invalid credentials")) {
     return new HttpError("INVALID_CREDENTIALS", "invalid email or password");
   }
@@ -82,13 +91,25 @@ export async function identityPasswordToken(email: string, password: string): Pr
   return identityFetch("/token", { grant_type: "password", email, password });
 }
 
+// A5: 区分「明确失效」与「瞬时失败」。
+// 返回 { ok: tokens, permanent: boolean }：
+//  - 明确失效（HTTP 401 / invalid_grant / refresh token 过期吊销）→ permanent=true，可安全 revoke
+//  - 网络抖动 / 5xx / 解析失败 → permanent=false，不 revoke（下个请求重试）
 export async function refreshIdentityToken(refreshToken: string): Promise<IdentityTokens | null> {
   try {
     return await identityFetch("/token", { grant_type: "refresh_token", refresh_token: refreshToken });
-  } catch {
-    return null;
+  } catch (e) {
+    if (e instanceof HttpError) {
+      // 明确失效：身份服务器明确拒绝了这枚 refresh token
+      if (e.status === 401) throw new RefreshPermanentError(e.message);
+      if (e.code === "INVALID_CREDENTIALS" || e.code === "INVALID_INPUT") throw new RefreshPermanentError(e.message);
+      // 其余（400/422/429/500 等）视为瞬时/可重试
+    }
+    return null; // 网络/5xx 瞬时失败
   }
 }
+export class RefreshPermanentError extends Error {}
+
 
 export async function identityVerify(payload: { type: string; token: string; password?: string }): Promise<any> {
   const body: Record<string, unknown> = { type: payload.type, token: payload.token };
@@ -141,14 +162,22 @@ export async function resolveUserId(req: Request): Promise<string | null> {
   if (Number(s.identity_expires_at) > nowSec()) return s.user_id as string;
 
   // 透明续期：客户端无 refresh 端点
-  const r = await refreshIdentityToken(s.identity_refresh_token as string);
-  if (!r) {
-    await dbRun("UPDATE sessions SET revoked=1 WHERE token_hash=?", [tokenHash]);
-    return null;
+  let r: IdentityTokens | null = null;
+  try {
+    r = await refreshIdentityToken(s.identity_refresh_token as string);
+  } catch (e) {
+    if (e instanceof RefreshPermanentError) {
+      await dbRun("UPDATE sessions SET revoked=1 WHERE token_hash=? AND identity_refresh_token=?", [tokenHash, s.identity_refresh_token]);
+      return null;
+    }
+    throw e;
   }
+  if (!r) return null; // 瞬时失败：不 revoke（会话仍有效，下次请求重试），本次请求按未认证处理
+  // A5: 条件 UPDATE 带 identity_refresh_token=? —— rotation 竞态保护：
+  // 并发请求已用更新后的 refresh_token 写回时，本请求不再覆盖其成功结果
   await dbRun(
-    `UPDATE sessions SET identity_access_token=?, identity_refresh_token=?, identity_expires_at=?, last_used_at=? WHERE token_hash=?`,
-    [r.access_token, r.refresh_token, nowSec() + r.expires_in, nowIso(), tokenHash],
+    `UPDATE sessions SET identity_access_token=?, identity_refresh_token=?, identity_expires_at=?, last_used_at=? WHERE token_hash=? AND identity_refresh_token=?`,
+    [r.access_token, r.refresh_token, nowSec() + r.expires_in, nowIso(), tokenHash, s.identity_refresh_token],
   );
   return s.user_id as string;
 }

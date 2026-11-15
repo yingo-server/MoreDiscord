@@ -2,7 +2,7 @@
 // 鉴权：session_token + is_admin 判定（users 表 admin 列，1 = 管理员）
 import { requireUser } from "../_shared/auth.ts";
 import { ok, HttpError } from "../_shared/response.ts";
-import { newId, nowIso, strArray } from "../_shared/validate.ts";
+import { newId, nowIso, strArray, encodeCursor, decodeCursor, validateDisplayName } from "../_shared/validate.ts";
 import { get as dbGet, all as dbAll, run as dbRun, transaction } from "../_shared/db.ts";
 import type { Ctx } from "./types.ts";
 
@@ -29,18 +29,29 @@ export async function adminListUsers(ctx: Ctx): Promise<Response> {
   void adminId;
   const limit = limitOf(ctx.url);
   const search = ctx.url.searchParams.get("search")?.toLowerCase() ?? "";
-  const cursor = ctx.url.searchParams.get("cursor") ?? "\uffff";
-  const pattern = search ? `%${search}%` : "%";
+  // B7: 转义 LIKE 通配符 % 和 _，ESCAPE '\' 字面量
+  const pattern = search
+    ? `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+    : "%";
+  // B8: 游标统一 Base64URL（与 messages.ts encodeCursor 一致）
+  const decoded = decodeCursor(ctx.url.searchParams.get("cursor"));
+  const cursor = decoded?.[0] ?? "\uffff";
+  const cursorId = decoded?.[1] ?? "\uffff";
   const users = await dbAll(
     `SELECT id, username, display_name, email, created_at, admin FROM users
-     WHERE username < ? AND username LIKE ? ORDER BY username ASC LIMIT ?`,
-    [cursor, pattern, limit + 1],
+     WHERE (username, id) < (?, ?) AND username LIKE ? ESCAPE '\\' ORDER BY username ASC LIMIT ?`,
+    [cursor, cursorId, pattern, limit + 1],
   );
   const hasMore = users.length > limit;
   const page = hasMore ? users.slice(0, limit) : users;
   const { attachTags } = await import("../_shared/displayName.ts");
-  const tagged = await attachTags(dbAll as any, page as any);
-  return ok({ users: tagged, next_cursor: hasMore ? page[page.length - 1].username : null });
+  const tagged = await attachTags(dbAll as any, page.map((u: any) => ({ ...u, id: u.id })) as any);
+  return ok({
+    users: tagged,
+    next_cursor: hasMore
+      ? encodeCursor(page[page.length - 1].username, page[page.length - 1].id)
+      : null,
+  });
 }
 
 // GET /api/v1/admin/users/:id
@@ -76,15 +87,18 @@ export async function adminPatchUser(ctx: Ctx, id: string): Promise<Response> {
       await tx.run("UPDATE users SET admin=? WHERE id=?", [v, id]);
     }
     if (ctx.body.display_name !== undefined) {
-      const dn = ctx.body.display_name;
-      if (dn !== null && typeof dn !== "string") {
-        throw new HttpError("INVALID_INPUT", "display_name must be string or null");
-      }
+      // B6: 复用 B4 的统一校验（trim/非空/≤64，空串存 NULL）
+      const dn = validateDisplayName(ctx.body.display_name);
       await tx.run("UPDATE users SET display_name=? WHERE id=?", [dn, id]);
     }
+    // B5: audit_log.detail 只记录已处理的白名单字段，不持久化任意 body
+    const detail = JSON.stringify({
+      ...(ctx.body.admin !== undefined ? { admin: Number(ctx.body.admin) } : {}),
+      ...(ctx.body.display_name !== undefined ? { display_name: validateDisplayName(ctx.body.display_name) } : {}),
+    });
     await tx.run(
       "INSERT INTO audit_log (id, actor_id, action, target_type, target_id, detail, created_at) VALUES (?,?,?,?,?,?,?)",
-      [newId(), adminId, "admin.patch_user", "user", id, JSON.stringify(ctx.body), nowIso()],
+      [newId(), adminId, "admin.patch_user", "user", id, detail, nowIso()],
     );
   });
   const u = await dbGet("SELECT id, username, display_name, admin FROM users WHERE id=?", [id]);
@@ -99,8 +113,7 @@ export async function adminListChannels(ctx: Ctx): Promise<Response> {
   if (type && type !== "direct" && type !== "group") {
     throw new HttpError("INVALID_INPUT", "type must be direct or group");
   }
-  const cursor = ctx.url.searchParams.get("cursor") ?? "9999-12-31T23:59:59.999Z|\uffff";
-  const [cAt, cId] = cursor.split("|");
+  const [cAt, cId] = decodeCursor(ctx.url.searchParams.get("cursor")) ?? ["9999-12-31T23:59:59.999Z", "\uffff"];
   let sql = `SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at,
     (SELECT COUNT(*) FROM conversation_members m WHERE m.conversation_id=c.id) AS member_count
     FROM conversations c WHERE (c.created_at, c.id) < (?, ?)`;
@@ -113,7 +126,7 @@ export async function adminListChannels(ctx: Ctx): Promise<Response> {
   const page = hasMore ? rows.slice(0, limit) : rows;
   return ok({
     channels: page,
-    next_cursor: hasMore ? `${page[page.length - 1].created_at}|${page[page.length - 1].id}` : null,
+    next_cursor: hasMore ? encodeCursor(page[page.length - 1].created_at, page[page.length - 1].id) : null,
   });
 }
 
@@ -139,8 +152,7 @@ export async function adminAuditMessages(ctx: Ctx, id: string): Promise<Response
   const limit = limitOf(ctx.url);
   const conv = await dbGet("SELECT id FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
-  const cursor = ctx.url.searchParams.get("cursor") ?? "9999-12-31T23:59:59.999Z|\uffff";
-  const [cAt, cId] = cursor.split("|");
+  const [cAt, cId] = decodeCursor(ctx.url.searchParams.get("cursor")) ?? ["9999-12-31T23:59:59.999Z", "\uffff"];
   const rows = await dbAll(
     `SELECT id, sender_id, content, created_at FROM messages
      WHERE conversation_id=? AND (created_at, id) < (?, ?)
@@ -151,7 +163,7 @@ export async function adminAuditMessages(ctx: Ctx, id: string): Promise<Response
   const page = hasMore ? rows.slice(0, limit) : rows;
   return ok({
     messages: page,
-    next_cursor: hasMore ? `${page[page.length - 1].created_at}|${page[page.length - 1].id}` : null,
+    next_cursor: hasMore ? encodeCursor(page[page.length - 1].created_at, page[page.length - 1].id) : null,
   });
 }
 
@@ -159,8 +171,7 @@ export async function adminAuditMessages(ctx: Ctx, id: string): Promise<Response
 export async function adminAuditLog(ctx: Ctx): Promise<Response> {
   await requireAdmin(ctx.req);
   const limit = limitOf(ctx.url);
-  const cursor = ctx.url.searchParams.get("cursor") ?? "9999-12-31T23:59:59.999Z|\uffff";
-  const [cAt, cId] = cursor.split("|");
+  const [cAt, cId] = decodeCursor(ctx.url.searchParams.get("cursor")) ?? ["9999-12-31T23:59:59.999Z", "\uffff"];
   const rows = await dbAll(
     `SELECT a.id, a.actor_id, u.username AS actor_username, a.action, a.target_type, a.target_id, a.detail, a.created_at
      FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id
@@ -172,7 +183,7 @@ export async function adminAuditLog(ctx: Ctx): Promise<Response> {
   const page = hasMore ? rows.slice(0, limit) : rows;
   return ok({
     entries: page,
-    next_cursor: hasMore ? `${page[page.length - 1].created_at}|${page[page.length - 1].id}` : null,
+    next_cursor: hasMore ? encodeCursor(page[page.length - 1].created_at, page[page.length - 1].id) : null,
   });
 }
 
