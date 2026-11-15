@@ -1,24 +1,37 @@
-// 语言检测（轻量启发式，仅用于判断"是否需要翻译"）
-// 规则：出现 CJK 字符视为中文；出现拉丁字母视为拉丁语系。
+// 语言判定：按字符占比
+// 目标语言 = 界面语言；统计其中"陌生字符"占比，达到阈值即视为跨语言消息。
+// 中性字符（数字、标点、空白、链接、@提及）不计入分母。
+export const FOREIGN_THRESHOLD = 0.35;
+
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/;
 const LATIN = /[A-Za-z]/;
 
-export type TextLang = "zh" | "latin" | "unknown";
+export type UiLang = "zh" | "en";
 
-export function detectTextLang(text: string): TextLang {
-  const t = text.trim();
-  if (!t) return "unknown";
-  const cjk = CJK.test(t);
-  const latin = LATIN.test(t);
-  if (cjk && !latin) return "zh";
-  if (latin && !cjk) return "latin";
-  return "unknown";
+export interface LangRatio {
+  native: number;
+  foreign: number;
+  ratio: number; // 陌生字符占比，0~1
 }
 
-/** 文本语言与目标界面语言不一致时，需要翻译 */
-export function needsTranslation(text: string, uiLang: "zh" | "en"): boolean {
-  const detected = detectTextLang(text);
-  if (detected === "unknown") return false;
-  const target = uiLang === "zh" ? "zh" : "latin";
-  return detected !== target;
+export function analyzeText(text: string, uiLang: UiLang): LangRatio {
+  const chars = [...text.trim()].filter((c) => !/\s/.test(c));
+  const isNative = uiLang === "zh" ? CJK : LATIN;
+  const isForeign = uiLang === "zh" ? LATIN : CJK;
+  let native = 0;
+  let foreign = 0;
+  for (const c of chars) {
+    if (isNative.test(c)) native++;
+    else if (isForeign.test(c)) foreign++;
+  }
+  const total = native + foreign;
+  return { native, foreign, ratio: total === 0 ? 0 : foreign / total };
+}
+
+/** 陌生字符占比达阈值 → 需要翻译 */
+export function needsTranslation(text: string, uiLang: UiLang): boolean {
+  if (!text.trim()) return false;
+  const { native, foreign, ratio } = analyzeText(text, uiLang);
+  if (native + foreign === 0) return false;
+  return ratio >= FOREIGN_THRESHOLD;
 }
