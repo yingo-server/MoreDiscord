@@ -1,5 +1,5 @@
 // api.ts —— 统一路由：pathname → handler（规格 §13）
-import { preflight } from "./_shared/cors.ts";
+import { preflight, CORS } from "./_shared/cors.ts";
 import { fail, failErr, readJson, HttpError } from "./_shared/response.ts";
 import { requireUser } from "./_shared/auth.ts";
 import * as auth from "./handlers/auth.ts";
@@ -11,10 +11,12 @@ import type { Ctx } from "./handlers/types.ts";
 export default async function api(req: Request): Promise<Response> {
   try {
     if (req.method === "OPTIONS") return preflight();
-
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/api\/v1/, "").replace(/\/+$/, "") || "/";
     const method = req.method.toUpperCase();
+
+    // 根路径健康检查（免认证）
+    if (method === "GET" && path === "/") return new Response(null, { status: 204, headers: CORS });
 
     // 无认证路由
     if (method === "POST" && path === "/auth/signup") {

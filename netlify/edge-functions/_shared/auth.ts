@@ -43,9 +43,9 @@ async function identityFetch(path: string, body: unknown): Promise<any> {
   return json;
 }
 
-// GoTrue {"code":422,"msg":"..."} → 网关错误码；禁止透传
+// GoTrue {"code":422,"msg":"..."} 或 {"error":"invalid_grant","error_description":"..."} → 网关错误码；禁止透传
 function mapIdentityError(json: any, status: number): HttpError {
-  const msg = String(json?.msg ?? "").toLowerCase();
+  const msg = String(json?.msg ?? json?.error_description ?? json?.error ?? json?.message ?? "").toLowerCase();
   if (msg.includes("already registered") || msg.includes("email exists") || msg.includes("user already exists")) {
     return new HttpError("EMAIL_EXISTS", "email already registered");
   }
