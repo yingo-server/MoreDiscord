@@ -1,4 +1,6 @@
 [build]
+  command = "cd frontend && npm ci && npm run build"
+  publish = "frontend/dist"
   edge_functions = "netlify/edge-functions"
 
 [[edge_functions]]
