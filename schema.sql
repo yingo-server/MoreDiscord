@@ -1,6 +1,6 @@
-# Turso 建表脚本（规格 §4 全量 SQL）
-# 用 turso CLI 或 sqlite3 客户端执行：
-#   turso db shell <db-name> < schema.sql
+-- Turso 建表脚本（规格 §4 全量 SQL）
+-- 用 turso CLI 或 sqlite3 客户端执行：
+--   turso db shell <db-name> < schema.sql
 
 CREATE TABLE users (
   id           TEXT PRIMARY KEY,
