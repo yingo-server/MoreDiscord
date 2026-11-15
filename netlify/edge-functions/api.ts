@@ -7,7 +7,6 @@ import * as auth from "./handlers/auth.ts";
 import * as user from "./handlers/user.ts";
 import * as conversations from "./handlers/conversations.ts";
 import * as messages from "./handlers/messages.ts";
-import * as admin from "./handlers/admin.ts";
 import type { Ctx } from "./handlers/types.ts";
 
 export default async function api(req: Request): Promise<Response> {
@@ -101,38 +100,6 @@ export default async function api(req: Request): Promise<Response> {
       if (method === "GET" && sub === "/messages/sync") {
         return await messages.syncMessages(await makeCtx(req, url), id);
       }
-    }
-
-    // admin 路由（requireAdmin 内部做 is_admin 校验）
-    if (path.startsWith("/admin/")) {
-      if (method === "GET" && path === "/admin/users") {
-        return await admin.adminListUsers(await makeCtx(req, url));
-      }
-      const userMatch = path.match(/^\/admin\/users\/([A-Za-z0-9-]+)$/);
-      if (method === "GET" && userMatch) {
-        return await admin.adminGetUser(await makeCtx(req, url), userMatch[1]);
-      }
-      if (method === "PATCH" && userMatch) {
-        return await admin.adminPatchUser(await makeCtx(req, url), userMatch[1]);
-      }
-      if (method === "GET" && path === "/admin/channels") {
-        return await admin.adminListChannels(await makeCtx(req, url));
-      }
-      const chMatch = path.match(/^\/admin\/channels\/([A-Za-z0-9-]+)$/);
-      if (method === "DELETE" && chMatch) {
-        return await admin.adminDeleteChannel(await makeCtx(req, url), chMatch[1]);
-      }
-      const auditMatch = path.match(/^\/admin\/channels\/([A-Za-z0-9-]+)\/messages$/);
-      if (method === "GET" && auditMatch) {
-        return await admin.adminAuditMessages(await makeCtx(req, url), auditMatch[1]);
-      }
-      if (method === "GET" && path === "/admin/audit-log") {
-        return await admin.adminAuditLog(await makeCtx(req, url));
-      }
-      if (method === "GET" && path === "/admin/stats/overview") {
-        return await admin.adminStats(await makeCtx(req, url));
-      }
-      return fail("INVALID_INPUT", `no admin route for ${method} ${path}`, 404);
     }
 
     return fail("INVALID_INPUT", `no route for ${method} ${path}`, 404);

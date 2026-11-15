@@ -1,0 +1,92 @@
+/* base.css — reset、字体、滚动条、动效、Mica 底 */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--md-sys-typescale-font);
+  font-size: var(--md-sys-typescale-body-size);
+  line-height: var(--md-sys-typescale-body-line-height);
+  color: var(--md-sys-color-on-surface);
+  background-color: var(--md-sys-color-surface-dim);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* Mica 模拟：基色 + 品牌 tint + 噪点（噪点用内联 SVG data URI，避免贴图请求） */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-color: var(--md-sys-color-surface);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"),
+    linear-gradient(0deg, var(--fl-mica-tint), var(--fl-mica-tint));
+  background-blend-mode: overlay, normal;
+  opacity: 1;
+}
+body::before { mix-blend-mode: normal; }
+#app, #app > * { position: relative; z-index: 1; }
+
+img, svg, video { display: block; max-width: 100%; }
+button, input, textarea, select { font: inherit; color: inherit; background: none; border: none; }
+button { cursor: pointer; }
+a { color: var(--md-sys-color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { list-style: none; }
+code, pre { font-family: var(--md-sys-typescale-mono-font); }
+[hidden] { display: none !important; }
+
+/* 焦点可见性 */
+:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+::placeholder { color: var(--md-sys-color-on-surface-variant); opacity: .8; }
+
+/* 滚动条（Fluent 风格细条） */
+* { scrollbar-width: thin; scrollbar-color: var(--md-sys-color-outline-variant) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--md-sys-color-outline); background-clip: content-box; }
+
+/* typescale 实用类 */
+.display-large { font-size: var(--md-sys-typescale-display-large-size); font-weight: var(--md-sys-typescale-display-large-weight); line-height: var(--md-sys-typescale-display-large-line-height); letter-spacing: var(--md-sys-typescale-display-large-tracking); }
+.display-medium { font-size: var(--md-sys-typescale-display-medium-size); font-weight: 600; line-height: var(--md-sys-typescale-display-medium-line-height); letter-spacing: -0.5px; }
+.headline { font-size: var(--md-sys-typescale-headline-size); font-weight: var(--md-sys-typescale-headline-weight); line-height: var(--md-sys-typescale-headline-line-height); }
+.title-large { font-size: var(--md-sys-typescale-title-large-size); font-weight: 600; line-height: var(--md-sys-typescale-title-large-line-height); }
+.title-medium { font-size: var(--md-sys-typescale-title-medium-size); font-weight: 600; line-height: var(--md-sys-typescale-title-medium-line-height); }
+.label { font-size: var(--md-sys-typescale-label-size); font-weight: var(--md-sys-typescale-label-weight); line-height: var(--md-sys-typescale-label-line-height); }
+.muted { color: var(--md-sys-color-on-surface-variant); }
+
+/* 新消息进入动画 */
+@keyframes msg-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pill-slide-in {
+  from { opacity: 0; transform: scaleY(.4); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.anim-msg { animation: msg-enter var(--md-duration-short) var(--md-easing-decelerate); }
+.anim-fade { animation: fade-in var(--md-duration-standard) var(--md-easing-standard); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
