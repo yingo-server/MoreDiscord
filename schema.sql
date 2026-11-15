@@ -38,7 +38,7 @@ CREATE TABLE messages (
   created_at       TEXT NOT NULL,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id),
   FOREIGN KEY (sender_id)       REFERENCES users(id),
-  -- 口径注意：此处 SQLite length() 按 Unicode 码点计数，与 JS 端 [...content].length 一致
+  -- length() 按 Unicode 码点计数，与 JS 端 [...content].length 一致
   CHECK (length(content) <= 4000)
 );
 

@@ -1,5 +1,5 @@
 /**
- * Discord-style display name disambiguation.
+ * Display name disambiguation.
  * Backend contract (for reference): `tag` is computed server-side on read —
  * users sharing the same display_name are ordered by created_at, the first
  * (unique holder) gets tag = 1, subsequent ones 2, 3, ... It is NOT persisted.

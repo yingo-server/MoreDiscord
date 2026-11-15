@@ -130,7 +130,6 @@ export function RegisterForm() {
           <div className="space-y-2">
             <Label htmlFor="username">{t("auth.register.username")}</Label>
             <Input id="username" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-            <p className="text-xs text-muted-foreground">{t("auth.register.usernameHint")}</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">{t("auth.register.password")}</Label>

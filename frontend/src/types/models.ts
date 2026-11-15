@@ -7,7 +7,7 @@ export interface User {
   email: string
   /** 1 = administrator */
   admin?: number
-  /** Discord-style tag: 1 = unique holder, 2+ = nth same-name user */
+  /** tag: 1 = unique holder, 2+ = nth same-name user */
   tag?: number
 }
 
@@ -15,7 +15,7 @@ export interface ConversationPeer {
   id: string
   username: string
   display_name: string
-  /** Discord-style tag: 1 = unique holder, 2+ = nth duplicate (computed server-side) */
+  /** tag: 1 = unique holder, 2+ = nth duplicate (computed server-side) */
   tag?: number
 }
 

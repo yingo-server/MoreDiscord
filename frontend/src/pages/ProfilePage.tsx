@@ -70,7 +70,6 @@ export default function ProfilePage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="display_name">{t("profile.displayName")}</Label>
-            <p className="text-xs text-muted-foreground">{t("profile.displayHint")}</p>
             <div className="flex gap-2">
               <Input
                 id="display_name"
