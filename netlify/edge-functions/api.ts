@@ -1,4 +1,5 @@
 // api.ts —— 统一路由：pathname → handler（规格 §13）
+// 双保险路由：netlify.toml 的 [[edge_functions]] path + 代码内 named config 导出
 import { preflight, CORS } from "./_shared/cors.ts";
 import { fail, failErr, readJson, HttpError } from "./_shared/response.ts";
 import { requireUser } from "./_shared/auth.ts";
@@ -115,3 +116,9 @@ async function makeCtx(req: Request, url: URL): Promise<Ctx> {
 function methodHasBody(method: string): boolean {
   return ["POST", "PATCH", "PUT", "DELETE"].includes(method.toUpperCase());
 }
+
+// 代码内路由声明：即使 netlify.toml 未生效也能挂上路由（官方推荐的双保险）
+// Config 类型仅在 Netlify 构建时可用；此处用结构化对象，类型由构建器校验
+export const config = {
+  path: ["/api/v1", "/api/v1/*"],
+};
