@@ -175,10 +175,9 @@ jobs:
         id: deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: 57e436c0-29ca-4615-bd8f-d399f5586ee5
         run: |
           cd release-dist
-          npx --yes netlify-cli@27.19.0 deploy --site "$NETLIFY_SITE_ID" \
+          npx --yes netlify-cli@27.19.0 deploy --site morediscord \
             --dir . --no-build --json > ../deploy.json
           cd ..
           cat deploy.json
