@@ -159,3 +159,58 @@ jobs:
           # 修正 import 路径（CI 环境仓库根目录）
           sed -i 's|/var/minis/workspace/chat-backend/netlify/edge-functions/platform/db.ts|./netlify/edge-functions/platform/db.ts|' live_test.ts
           deno run -A live_test.ts
+
+  deploy-release:
+    runs-on: ubuntu-latest
+    needs: [build-frontend, typecheck, smoke, live-db, emoji, frontend-check]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli@17
+      - name: Download built frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: release-dist
+      - name: Package site zip
+        run: |
+          mkdir -p release-site
+          cp -r release-dist/. release-site/
+          cp netlify.toml release-site/netlify.toml
+          mkdir -p release-site/netlify/edge-functions
+          cp -r netlify/edge-functions/. release-site/netlify/edge-functions/
+          cd release-site && zip -qr ../MoreDiscord-site.zip .
+          ls -lh ../MoreDiscord-site.zip
+      - name: Deploy to Netlify (CLI, no build)
+        id: deploy
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          sh tool/netlify_deploy.sh "${{ vars.NETLIFY_SITE || 'morediscord' }}" \
+            release-dist deploy.json
+          cat deploy.json
+      - name: Fetch deploy log
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          DID=$(python3 -c "import json;print(json.load(open('deploy.json'))['deploy_id'])")
+          python3 tool/netlify_deploy_check.py "${{ vars.NETLIFY_SITE || 'morediscord' }}" || true
+          echo "DEPLOY_ID=$DID" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$(date -u +%Y%m.%d.%H%M)"
+          gh release create "$TAG" MoreDiscord-site.zip deploy.json \
+            --title "MoreDiscord $TAG" \
+            --notes "Auto-deploy $(cat deploy.json)" \
+            --prerelease=false
+          echo "Release $TAG created"
