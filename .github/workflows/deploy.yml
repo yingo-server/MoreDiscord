@@ -189,19 +189,28 @@ jobs:
           cp -r netlify/edge-functions/. release-site/netlify/edge-functions/
           cd release-site && zip -qr ../MoreDiscord-site.zip .
           ls -lh ../MoreDiscord-site.zip
+      - name: Verify Netlify auth
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          netlify status --json || true
+          echo "token length: ${#NETLIFY_AUTH_TOKEN}"
       - name: Deploy to Netlify (CLI, no build)
         id: deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: 57e436c0-29ca-4615-bd8f-d399f5586ee5
         run: |
           cd release-dist
           set +e
-          netlify deploy --site "${{ vars.NETLIFY_SITE || 'morediscord' }}" \
+          netlify deploy --site "$NETLIFY_SITE_ID" \
             --dir . --no-build --json > ../deploy.json 2>&1
           rc=$?
           cd ..
           echo "netlify deploy exit: $rc"
+          echo "---- deploy.json content ----"
           cat deploy.json
+          echo "-----------------------------"
           exit $rc
       - name: Fetch deploy log
         env:
