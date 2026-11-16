@@ -18,6 +18,22 @@ jobs:
           deno check api.ts
           for f in contracts/*.ts platform/*.ts domain/*.ts handlers/*.ts; do deno check "$f"; done
 
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
   emoji:
     runs-on: ubuntu-latest
     steps:
