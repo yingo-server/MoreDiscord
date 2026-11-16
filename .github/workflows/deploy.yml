@@ -33,24 +33,6 @@ jobs:
           name: frontend-dist
           path: frontend/dist
           retention-days: 7
-      - name: Check Netlify deploy status
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE: ${{ vars.NETLIFY_SITE || 'morediscord' }}
-        run: |
-          # 等 Netlify 自动构建启动（最多等 3 分钟，每 15s 查一次）
-          for i in $(seq 1 12); do
-            echo "--- Netlify deploy check (attempt $i) ---"
-            python3 tool/netlify_deploy_check.py "$NETLIFY_SITE"
-            rc=$?
-            if [ "$rc" -eq 0 ]; then echo "部署检查完成"; exit 0; fi
-            if [ "$rc" -eq 1 ]; then echo "Netlify 部署失败，见上方日志"; exit 1; fi
-            # rc=2: 构建中，继续等
-            sleep 15
-          done
-          echo "Netlify 部署在 3 分钟内未完成，超时"
-          exit 1
-
   emoji:
     runs-on: ubuntu-latest
     steps:
