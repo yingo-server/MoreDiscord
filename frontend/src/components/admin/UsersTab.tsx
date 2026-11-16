@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react"
-import { getAdminUsers } from "@/api/admin"
+import { getAdminUsers, deleteAdminUser } from "@/api/admin"
 import type { User } from "@/types/models"
 import type { AdminPage } from "@/types/api"
 import { Button } from "@/components/ui/button"
@@ -45,6 +45,16 @@ export function UsersTab() {
     }
   }, [search, load])
 
+  async function onDelete(u: User) {
+    if (!window.confirm(t("admin.users.deleteConfirm", { name: u.username }))) return
+    try {
+      await deleteAdminUser(u.id)
+      setUsers((prev) => prev.filter((x) => x.id !== u.id))
+    } catch (e: unknown) {
+      setError(t("admin.opFailed"))
+    }
+  }
+
   return (
     <div>
       <div className="mb-4 max-w-sm">
@@ -59,6 +69,7 @@ export function UsersTab() {
               <th className="px-4 py-2 font-medium">{t("admin.users.display")}</th>
               <th className="px-4 py-2 font-medium">{t("admin.users.email")}</th>
               <th className="px-4 py-2 font-medium">{t("admin.users.role")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.ch.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -73,6 +84,15 @@ export function UsersTab() {
                   ) : (
                     <Badge variant="secondary">{t("admin.users.roleUser")}</Badge>
                   )}
+                </td>
+                <td className="px-4 py-2">
+                  <button
+                    type="button"
+                    className="text-xs text-destructive hover:underline disabled:opacity-50"
+                    onClick={() => onDelete(u)}
+                  >
+                    {t("common.delete")}
+                  </button>
                 </td>
               </tr>
             ))}

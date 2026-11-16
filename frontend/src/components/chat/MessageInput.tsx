@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import * as chatApi from "@/api/chat"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 const MAX_LEN = 4000
 
@@ -42,7 +44,7 @@ export function MessageInput() {
       useMessageStore.getState().appendMessage(msg)
     } catch (e: unknown) {
       setText(content)
-      addToast((e as Error)?.message || t("input.sendFailed"), "error")
+      addToast(errorText((e as ApiError)?.code, t("input.sendFailed")), "error")
     } finally {
       setSending(false)
     }

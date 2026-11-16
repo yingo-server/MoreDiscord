@@ -2,12 +2,13 @@
 -- 用 turso CLI 或 sqlite3 客户端执行：
 --   turso db shell <db-name> < schema.sql
 CREATE TABLE users (
-  id           TEXT PRIMARY KEY,
-  username     TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  email        TEXT,
-  admin        INTEGER NOT NULL DEFAULT 0,   -- 1 = 管理员（/admin/* 门禁）
-  created_at   TEXT NOT NULL
+  id            TEXT PRIMARY KEY,
+  username      TEXT UNIQUE NOT NULL,
+  display_name  TEXT,
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,              -- pbkdf2$iter$salt$hash
+  admin         INTEGER NOT NULL DEFAULT 0, -- 1 = 管理员（/admin/* 门禁）
+  created_at    TEXT NOT NULL
 );
 
 CREATE TABLE conversations (
@@ -43,14 +44,11 @@ CREATE TABLE messages (
 );
 
 CREATE TABLE sessions (
-  token_hash             TEXT PRIMARY KEY,
-  user_id                TEXT NOT NULL,
-  identity_access_token  TEXT NOT NULL,
-  identity_refresh_token TEXT NOT NULL,
-  identity_expires_at    INTEGER NOT NULL,
-  created_at             TEXT NOT NULL,
-  last_used_at           TEXT NOT NULL,
-  revoked                INTEGER NOT NULL DEFAULT 0,
+  token_hash   TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  created_at   TEXT NOT NULL,
+  last_used_at TEXT NOT NULL,
+  revoked      INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -63,6 +61,23 @@ CREATE INDEX idx_sessions_revoked_user ON sessions(revoked, user_id);
 -- B12: displayName tag 计算 / attachTags 走 COALESCE(display_name, username) 等值查询
 CREATE INDEX idx_users_display_name ON users(display_name);
 CREATE INDEX idx_users_username_created ON users(username, created_at, id);
+
+-- 功能开关（发信冻结：email_verification_required=0）
+CREATE TABLE settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- 邮箱验证令牌（发信冻结期不使用，留位）
+CREATE TABLE email_tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  type       TEXT NOT NULL CHECK (type IN ('signup','recover')),
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX idx_email_tokens_user   ON email_tokens(user_id);
 
 -- 管理操作审计日志（/admin/* 端点写入）
 CREATE TABLE audit_log (

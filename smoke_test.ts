@@ -5,7 +5,6 @@
 const envMap = new Map<string, string>([
   ["TURSO_DATABASE_URL", "http://127.0.0.1:1/v2/pipeline"],
   ["TURSO_AUTH_TOKEN", "test"],
-  ["IDENTITY_ORIGIN", "http://127.0.0.1:2"],
 ]);
 
 // deno 是单进程；在 import 模块前无法 patch Deno.env，所以这里改为直接 patch fetch + Deno.env getter
@@ -160,19 +159,22 @@ function execStmt(sql: string, args: any[]): ExecuteResult {
     return { results: { rows: outRows, cols }, __debugRows: rows.length };
   }
 
-  // INSERT INTO sessions
+  // INSERT INTO sessions（token_hash,user_id,created_at,last_used_at）
   if (/insert\s+into\s+sessions/i.test(s)) {
-    const [tokenHash, userId, at, rt, exp, created, lastUsed] = args.map(v);
-    T.push({ token_hash: tokenHash, user_id: userId, identity_access_token: at, identity_refresh_token: rt, identity_expires_at: Number(exp), created_at: created, last_used_at: lastUsed, revoked: 0 });
+    const [tokenHash, userId, created, lastUsed] = args.map(v);
+    T.push({ token_hash: tokenHash, user_id: userId, created_at: created, last_used_at: lastUsed, revoked: 0 });
     return { results: { rows: [], cols: [] } };
   }
-  // INSERT INTO users
+  // INSERT INTO users（id,username,email,password_hash,created_at）
   if (/insert\s+into\s+users/i.test(s)) {
-    const [id, username, email, created] = args.map(v);
+    const [id, username, email, passwordHash, created] = args.map(v);
     if (tables.users.some((u) => u.username === username)) {
       return { error: { message: "UNIQUE constraint failed: users.username" } };
     }
-    T.push({ id, username, email, created_at: created, display_name: null });
+    if (tables.users.some((u) => u.email === email)) {
+      return { error: { message: "UNIQUE constraint failed: users.email" } };
+    }
+    T.push({ id, username, email, password_hash: passwordHash, created_at: created, display_name: null, admin: 0 });
     return { results: { rows: [], cols: [] } };
   }
   // INSERT INTO conversations（type/name 可能是字面量）
@@ -296,50 +298,9 @@ const origFetch = globalThis.fetch;
     }
     return new Response(JSON.stringify({ results }), { status: 200 });
   }
-  // Identity mock
-  let body: any = {};
-  if (init?.body) {
-    const ct = (init.headers?.["Content-Type"] ?? init.headers?.get?.("Content-Type") ?? "") as string;
-    if (ct.includes("x-www-form-urlencoded")) {
-      body = Object.fromEntries(new URLSearchParams(String(init.body)));
-    } else {
-      body = JSON.parse(String(init.body));
-    }
-  }
-  const path = url.replace(/^https?:\/\/[^/]+/, "");
-  if (path.endsWith("/token") && body.grant_type === "password") {
-    const uid = body.email === "alice@test.com" ? "id-alice" : body.email === "bob@test.com" ? "id-bob" : null;
-    if (uid && body.password === "Passw0rd!123") {
-      return Response.json({ access_token: mkJwt(uid), refresh_token: "rfr", expires_in: 3600 });
-    }
-    return Response.json({ code: 400, msg: "Invalid email or password" }, { status: 400 });
-  }
-  if (path.endsWith("/signup")) {
-    if (body.email === "taken@test.com") {
-      return Response.json({ code: 422, msg: "User already registered" }, { status: 422 });
-    }
-    if (body.password === "weak") {
-      return Response.json({ code: 422, msg: "Password should be at least 8 characters" }, { status: 422 });
-    }
-    return Response.json({ id: `id-${body.email.split("@")[0]}`, access_token: mkJwt(`id-${body.email.split("@")[0]}`), refresh_token: "rfr", expires_in: 3600 });
-  }
-  if (path.endsWith("/verify")) {
-    // A11: 真实 GoTrue /verify 返回 AccessTokenResponse 形状：顶层无 id，user.id 嵌套
-    return Response.json({
-      access_token: mkJwt("id-bob"),
-      token_type: "bearer",
-      expires_in: 3600,
-      refresh_token: "rfr",
-      user: { id: "id-bob", email: "bob@test.com", aud: "", role: "", email_confirmed_at: null, app_metadata: {}, user_metadata: {} },
-    });
-  }
-  if (path.endsWith("/recover")) return Response.json({});
+  // 无外部认证服务：所有请求都是 Turso pipeline
   return new Response("{}", { status: 200 });
 };
-function mkJwt(sub: string) {
-  const b = (o: any) => btoa(JSON.stringify(o)).replace(/=+$/, "");
-  return `${b({ alg: "HS256", typ: "JWT" })}.${b({ sub })}.sig`;
-}
 
 // ---- 测试 ----
 const { default: api } = await import("./netlify/edge-functions/api.ts");
@@ -362,7 +323,7 @@ async function call(method: string, path: string, opts: { token?: string; body?:
   return { status: res.status, json };
 }
 
-// 预置用户（绕过 Identity 邮箱流程）：直接用 signup
+// 注册即用（邮箱验证冻结）
 console.log("== signup ==");
 const r1 = await call("POST", "/auth/signup", { body: { email: "alice@test.com", password: "Passw0rd!123", username: "Alice" } });
 check("signup 200", r1.status === 200, r1);
@@ -372,13 +333,17 @@ check("username 转小写", r1.json?.data?.user?.username === "alice", r1.json);
 
 const r2 = await call("POST", "/auth/signup", { body: { email: "bob@test.com", password: "Passw0rd!123", username: "bob" } });
 const bobTok = r2.json?.data?.session_token;
-check("bob signup", !!bobTok);
+const bobId = r2.json?.data?.user?.id;
+const aliceId = r1.json?.data?.user?.id;
+check("bob signup", !!bobTok && !!bobId);
 
 const rDup = await call("POST", "/auth/signup", { body: { email: "x@test.com", password: "Passw0rd!123", username: "bob" } });
 check("username 冲突 → USERNAME_TAKEN", rDup.status === 409 && rDup.json?.error?.code === "USERNAME_TAKEN", rDup.json);
 
 const rWeak = await call("POST", "/auth/signup", { body: { email: "y@test.com", password: "weak", username: "carol" } });
-check("弱密码 → INVALID_INPUT + 用户名已补偿删除", rWeak.status === 400, rWeak.json);
+check("弱密码 → INVALID_INPUT", rWeak.status === 400 && rWeak.json?.error?.code === "INVALID_INPUT", rWeak.json);
+const rDupEmail = await call("POST", "/auth/signup", { body: { email: "alice@test.com", password: "Passw0rd!123", username: "other" } });
+check("邮箱冲突 → EMAIL_EXISTS", rDupEmail.status === 409 && rDupEmail.json?.error?.code === "EMAIL_EXISTS", rDupEmail.json);
 
 console.log("== auth ==");
 const rMe = await call("GET", "/auth/me", { token: aliceTok });
@@ -392,7 +357,9 @@ check("login 得到 token", rLogin.json?.data?.session_token?.startsWith("sess_"
 const rBadLogin = await call("POST", "/auth/login", { body: { email: "alice@test.com", password: "wrong" } });
 check("错密码 → INVALID_CREDENTIALS", rBadLogin.status === 401 && rBadLogin.json?.error?.code === "INVALID_CREDENTIALS", rBadLogin.json);
 const rRecover = await call("POST", "/auth/recover", { body: { email: "ghost@test.com" } });
-check("recover 防枚举 200", rRecover.status === 200);
+check("recover 发信冻结 → 400", rRecover.status === 400, rRecover.json);
+const rVerify = await call("POST", "/auth/verify", { body: { type: "signup", token: "x" } });
+check("verify 发信冻结 → 400", rVerify.status === 400, rVerify.json);
 const rOut = await call("POST", "/auth/logout", { token: aliceTok });
 check("logout ok", rOut.json?.data?.ok === true);
 const rAfterOut = await call("GET", "/auth/me", { token: aliceTok });
@@ -401,29 +368,21 @@ check("logout 后同 token 401", rAfterOut.status === 401);
 const rRe = await call("POST", "/auth/login", { body: { email: "alice@test.com", password: "Passw0rd!123" } });
 const aliceTok2 = rRe.json?.data?.session_token;
 
-// A11/A2: verify mock 已改为真实 AccessTokenResponse 形状（user.id 嵌套、顶层无 id），
-// 断言 verify 不再 500 且能正确解析 user.id 建会话
-const rVerify = await call("POST", "/auth/verify", { body: { type: "signup", token: "confirm-token" } });
-check("verify(AccessTokenResponse 形状) 200 非 500", rVerify.status === 200 && rVerify.json?.data?.session_token?.startsWith("sess_"), rVerify.json);
-check("verify 解析出 user.id=id-bob", rVerify.json?.data?.user?.id === "id-bob", rVerify.json);
-const rVerifyTok = rVerify.json?.data?.session_token;
-const rVerifyMe = await call("GET", "/auth/me", { token: rVerifyTok });
-check("verify 会话可用 /auth/me", rVerifyMe.status === 200, rVerifyMe.json);
 
 // 群聊：先注册 8 个真实用户（规格要求成员必须存在）
 const realIds: string[] = [];
 for (let i = 0; i < 9; i++) {
   const r = await call("POST", "/auth/signup", { body: { email: `member${i}@test.com`, password: "Passw0rd!123", username: `member${i}` } });
-  realIds.push(`id-member${i}`);
+  realIds.push(r.json?.data?.user?.id);
   if (!r.json?.data?.session_token) console.log(`  !! signup member${i} failed:`, r.status, r.json);
 }
 console.log("== conversations ==");
-const rD1 = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: "id-bob" } });
+const rD1 = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: bobId } });
 check("创建私聊", rD1.status === 200 && rD1.json?.data?.id, rD1.json);
 const convId = rD1.json?.data?.id;
-const rD2 = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: "id-bob" } });
+const rD2 = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: bobId } });
 check("重复创建私聊返回同一 id", rD2.json?.data?.id === convId, rD2.json);
-const rSelf = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: "id-alice" } });
+const rSelf = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: aliceId } });
 check("不能和自己私聊 → 400", rSelf.status === 400, rSelf.json);
 const rGhost = await call("POST", "/conversations/direct", { token: aliceTok2, body: { targetUserId: "id-nope" } });
 check("目标不存在 → USER_NOT_FOUND", rGhost.json?.error?.code === "USER_NOT_FOUND", rGhost.json);
@@ -437,11 +396,11 @@ check("11+ 人群 → GROUP_FULL", rGFull.json?.error?.code === "GROUP_FULL", rG
 const rGName = await call("POST", "/conversations/group", { token: aliceTok2, body: { name: "", memberIds: [] } });
 check("空群名 → NAME_INVALID", rGName.json?.error?.code === "NAME_INVALID", rGName.json);
 
-const rAdd10 = await call("POST", `/conversations/${gid}/members`, { token: aliceTok2, body: { userId: "id-member8" } });
+const rAdd10 = await call("POST", `/conversations/${gid}/members`, { token: aliceTok2, body: { userId: realIds[8] } });
 check("加第 10 人成功", rAdd10.status === 200, rAdd10.json);
-const rAdd11 = await call("POST", `/conversations/${gid}/members`, { token: aliceTok2, body: { userId: "id-bob" } });
+const rAdd11 = await call("POST", `/conversations/${gid}/members`, { token: aliceTok2, body: { userId: bobId } });
 check("加第 11 人 → GROUP_FULL", rAdd11.json?.error?.code === "GROUP_FULL", rAdd11.json);
-const rAddDup = await call("POST", `/conversations/${gid}/members`, { token: bobTok, body: { userId: "id-bob" } });
+const rAddDup = await call("POST", `/conversations/${gid}/members`, { token: bobTok, body: { userId: bobId } });
 check("非 owner 加人 → 403", rAddDup.status === 403, rAddDup.json);
 
 const rDetail = await call("GET", `/conversations/${gid}`, { token: aliceTok2 });
@@ -450,7 +409,7 @@ check("详情 my_role=owner member_count=10", rDetail.json?.data?.my_role === "o
 const rList = await call("GET", "/conversations", { token: aliceTok2 });
 check("会话列表 2 条", Array.isArray(rList.json?.data) && rList.json.data.length === 2, rList.json?.data?.length);
 const directRow = rList.json.data.find((c: any) => c.type === "direct");
-check("私聊 peer=bob", directRow?.peer?.id === "id-bob", directRow);
+check("私聊 peer=bob", directRow?.peer?.id === bobId, directRow);
 
 console.log("== messages ==");
 const rSend = await call("POST", `/conversations/${convId}/messages`, { token: aliceTok2, body: { content: "hello bob" } });
@@ -467,7 +426,7 @@ check("非成员读 → 401（伪造）", rNonMember.status === 401);
 // owner leave / transfer
 const rOwnerLeave = await call("POST", `/conversations/${gid}/leave`, { token: aliceTok2 });
 check("owner 直接退群 → OWNER_MUST_TRANSFER_OR_DELETE", rOwnerLeave.json?.error?.code === "OWNER_MUST_TRANSFER_OR_DELETE", rOwnerLeave.json);
-const rTransfer = await call("POST", `/conversations/${gid}/transfer`, { token: aliceTok2, body: { userId: "id-bob" } });
+const rTransfer = await call("POST", `/conversations/${gid}/transfer`, { token: aliceTok2, body: { userId: bobId } });
 check("转让给非成员 → NOT_A_MEMBER", rTransfer.json?.error?.code === "NOT_A_MEMBER", rTransfer.json);
 // 先把 bob 加不进（满 10），用 direct conv 测 leave 权限链
 // B1（批次 B 已改 conversations.ts）：规格 §4 禁止私聊 leave → NOT_A_GROUP 400

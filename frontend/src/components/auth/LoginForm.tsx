@@ -2,11 +2,13 @@ import { useState } from "react"
 import { useNavigate, Link } from "react-router"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { markPendingUnconfirmed, consumePendingUnconfirmed } from "@/i18n"
+import { errorText } from "@/i18n/errors"
 import { t } from "@/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ApiError } from "@/api/client"
 
 export function LoginForm() {
   const navigate = useNavigate()
@@ -26,14 +28,14 @@ export function LoginForm() {
       await login(email.trim(), password)
       navigate("/", { replace: true })
     } catch (err: unknown) {
-      const msg = (err as Error)?.message || t("auth.login.failed")
-      if (/INVALID_CREDENTIALS|invalid credentials/i.test(msg)) {
-        setError(t("auth.login.emailOrPasswordWrong"))
+      const code = err instanceof ApiError ? err.code : undefined
+      if (code === "INVALID_CREDENTIALS" || code === "EMAIL_NOT_CONFIRMED") {
+        setError(errorText(code, t("auth.login.emailOrPasswordWrong")))
         if (consumePendingUnconfirmed()) {
           setHint(t("auth.login.unconfirmedHint"))
         }
       } else {
-        setError(msg)
+        setError(errorText(code, t("auth.login.failed")))
       }
     } finally {
       setLoading(false)

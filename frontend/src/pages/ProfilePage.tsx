@@ -12,6 +12,8 @@ import { useToast } from "@/components/ui/toast"
 import { Shield, User } from "lucide-react"
 import { formatDisplayName } from "@/lib/displayName"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 export default function ProfilePage() {
   const user = useAuthStore((s) => s.user)
@@ -35,7 +37,7 @@ export default function ProfilePage() {
       await fetchMe()
       addToast(t("profile.updated"), "success")
     } catch (e: unknown) {
-      addToast((e as Error)?.message || t("profile.saveFailed"), "error")
+      addToast(errorText((e as ApiError)?.code, t("profile.saveFailed")), "error")
     } finally {
       setSaving(false)
     }

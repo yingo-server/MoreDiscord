@@ -3,13 +3,15 @@ import { getStatsOverview, type AdminStatsOverview } from "@/api/admin"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 export function OverviewTab() {
   const [stats, setStats] = useState<AdminStatsOverview | null>(null)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    getStatsOverview().then(setStats).catch((e: Error) => setError(e.message))
+    getStatsOverview().then(setStats).catch((e: unknown) => setError(errorText((e as ApiError)?.code)))
   }, [])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>

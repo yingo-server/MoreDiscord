@@ -14,6 +14,8 @@ import { AuditTab } from "@/components/admin/AuditTab"
 import { UsersTab } from "@/components/admin/UsersTab"
 import { ShieldAlert } from "lucide-react"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 export default function AdminPage() {
   const user = useAuthStore((s) => s.user)
@@ -35,7 +37,7 @@ export default function AdminPage() {
     import("@/api/admin").then((m) => {
       const { getStatsOverview } = m
       getStatsOverview().catch((e: Error) => {
-        if (/forbidden|403/i.test(e.message)) setForbidden(true)
+        if (e instanceof ApiError && (e.code === "FORBIDDEN" || e.status === 403)) setForbidden(true)
       })
     })
   }, [isAdmin])
@@ -54,7 +56,7 @@ export default function AdminPage() {
       await confirm.onConfirm()
       setConfirm(null)
     } catch (e: unknown) {
-      addToast((e as Error)?.message || t("admin.opFailed"), "error")
+      addToast(errorText((e as ApiError)?.code, t("admin.opFailed")), "error")
     } finally {
       setBusy(false)
     }

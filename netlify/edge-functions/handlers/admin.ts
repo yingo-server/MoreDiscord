@@ -104,6 +104,26 @@ export async function adminPatchUser(ctx: Ctx, id: string): Promise<Response> {
   return ok(u);
 }
 
+// DELETE /api/v1/admin/users/:id —— 注销账号（删用户 + 吊销会话 + 删其会话成员关系）
+export async function adminDeleteUser(ctx: Ctx, id: string): Promise<Response> {
+  const adminId = await requireAdmin(ctx);
+  const target = await dbGet("SELECT id, username FROM users WHERE id=?", [id]);
+  if (!target) throw new HttpError("USER_NOT_FOUND", "user does not exist");
+  if (id === adminId) throw new HttpError("INVALID_INPUT", "cannot delete self");
+
+  await transaction("write", async (tx) => {
+    // 先删会话成员关系（成员表 FK 指向用户），再删会话与用户
+    await tx.run("DELETE FROM conversation_members WHERE user_id=?", [id]);
+    await tx.run("UPDATE sessions SET revoked=1 WHERE user_id=?", [id]);
+    await tx.run(
+      "INSERT INTO audit_log (id, actor_id, action, target_type, target_id, detail, created_at) VALUES (?,?,?,?,?,?,?)",
+      [newId(), adminId, "admin.delete_user", "user", id, JSON.stringify({ username: target.username }), nowIso()],
+    );
+    await tx.run("DELETE FROM users WHERE id=?", [id]);
+  });
+  return ok({ id, deleted: true });
+}
+
 // GET /api/v1/admin/channels?cursor=<created_at|id>&limit=&type=
 export async function adminListChannels(ctx: Ctx): Promise<Response> {
   await requireAdmin(ctx);

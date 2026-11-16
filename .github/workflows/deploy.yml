@@ -78,15 +78,15 @@ jobs:
           await run("DELETE FROM conversations WHERE created_by LIKE 'it-%'").catch(()=>{});
           await run("DELETE FROM users WHERE id LIKE 'it-%'").catch(()=>{});
           await run("DELETE FROM sessions WHERE user_id LIKE 'it-%'").catch(()=>{});
-          await run("INSERT INTO users (id, username, email, created_at) VALUES ('it-u1','ittest1','it1@t.com','2026-01-01')");
-          await run("INSERT INTO users (id, username, email, created_at) VALUES ('it-u2','ittest2','it2@t.com','2026-01-01')");
+          await run("INSERT INTO users (id, username, email, password_hash, created_at) VALUES ('it-u1','ittest1','it1@t.com','pbkdf2$10000$x$y','2026-01-01')");
+          await run("INSERT INTO users (id, username, email, password_hash, created_at) VALUES ('it-u2','ittest2','it2@t.com','pbkdf2$10000$x$y','2026-01-01')");
           check("run insert x2", true);
           const u = await get("SELECT id, username, email FROM users WHERE id=?", ["it-u1"]);
           check("get 参数化查询", u?.username === "ittest1", u);
           const allU = await all("SELECT id, username FROM users WHERE id LIKE ?", ["it-%"]);
           check("all 返回 2 行", allU.length === 2, allU);
           let dupErr = false;
-          try { await run("INSERT INTO users (id, username, email, created_at) VALUES ('it-u3','ittest1','x@t.com','2026-01-01')"); }
+          try { await run("INSERT INTO users (id, username, email, password_hash, created_at) VALUES ('it-u3','ittest1','x@t.com','pbkdf2$10000$x$y','2026-01-01')"); }
           catch { dupErr = true; }
           check("unique 冲突抛错", dupErr);
           try {

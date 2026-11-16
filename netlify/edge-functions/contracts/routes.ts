@@ -46,6 +46,7 @@ export const ROUTES: RouteDef[] = [
   { method: "GET", pattern: "/admin/users", auth: true, admin: true, handler: "adminListUsers" },
   { method: "GET", pattern: "/admin/users/([A-Za-z0-9-]+)", auth: true, admin: true, handler: "adminGetUser", arg: "id" },
   { method: "PATCH", pattern: "/admin/users/([A-Za-z0-9-]+)", auth: true, admin: true, handler: "adminPatchUser", arg: "id" },
+  { method: "DELETE", pattern: "/admin/users/([A-Za-z0-9-]+)", auth: true, admin: true, handler: "adminDeleteUser", arg: "id" },
   { method: "GET", pattern: "/admin/channels", auth: true, admin: true, handler: "adminListChannels" },
   { method: "DELETE", pattern: "/admin/channels/([A-Za-z0-9-]+)", auth: true, admin: true, handler: "adminDeleteChannel", arg: "id" },
   { method: "GET", pattern: "/admin/channels/([A-Za-z0-9-]+)/messages", auth: true, admin: true, handler: "adminAuditMessages", arg: "id" },

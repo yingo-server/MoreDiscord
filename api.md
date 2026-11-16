@@ -1,7 +1,7 @@
 # Coalchat API 文档
 
 Base URL：`/api/v1`（同站点相对路径）
-认证：`Authorization: Bearer sess_xxx`（除标注「无需认证」外全部必需）
+认证：`Authorization: Bearer sess_xxx`（除标注「无需认证」外全部必需）。账号由 Turso 自管，密码 PBKDF2-SHA256 哈希，邮箱验证功能当前冻结。
 统一响应：成功 `{"data": ..., "error": null}`；失败 `{"data": null, "error": {"code": "...", "message": "..."}}`
 
 ## 错误码总表
@@ -24,6 +24,7 @@ Base URL：`/api/v1`（同站点相对路径）
 | USERNAME_TAKEN | 409 | 用户名冲突 |
 | EMAIL_EXISTS | 409 | 邮箱已注册 |
 | ALREADY_MEMBER | 409 | 目标已在会话 |
+| EMAIL_TAKEN | 409 | 邮箱已被占用 |
 | TRANSLATION_UNAVAILABLE | 502 | 翻译上游不可用 |
 
 ---
