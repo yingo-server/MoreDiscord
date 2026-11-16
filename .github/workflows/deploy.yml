@@ -174,7 +174,7 @@ jobs:
         with:
           node-version: "22"
       - name: Install Netlify CLI
-        run: npm install -g netlify-cli@27
+        run: npm install -g netlify-cli@27.19.0
       - name: Download built frontend
         uses: actions/download-artifact@v4
         with:
@@ -195,11 +195,14 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         run: |
           cd release-dist
+          set +e
           netlify deploy --site "${{ vars.NETLIFY_SITE || 'morediscord' }}" \
-            --dir . --no-build --json | tee ../deploy.json
+            --dir . --no-build --json > ../deploy.json 2>&1
+          rc=$?
           cd ..
-          test -s deploy.json
+          echo "netlify deploy exit: $rc"
           cat deploy.json
+          exit $rc
       - name: Fetch deploy log
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
