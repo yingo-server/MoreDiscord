@@ -194,8 +194,11 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         run: |
-          sh tool/netlify_deploy.sh "${{ vars.NETLIFY_SITE || 'morediscord' }}" \
-            release-dist deploy.json
+          cd release-dist
+          netlify deploy --site "${{ vars.NETLIFY_SITE || 'morediscord' }}" \
+            --dir . --no-build --json | tee ../deploy.json
+          cd ..
+          test -s deploy.json
           cat deploy.json
       - name: Fetch deploy log
         env:
