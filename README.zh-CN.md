@@ -11,8 +11,8 @@
 ├── smoke_test.ts                   # 离线冒烟测试（45 断言）
 ├── tool/                           # 语言判定与按钮可见性测试、emoji 检查
 ├── frontend/                       # React + TS + Vite + Tailwind（源码）
-├── AUDIT_BACKEND.md                # 后端审查报告
-├── AUDIT_FRONTEND.md               # 前端审查报告
+├── AUDIT_BACKEND2.md               # 后端审查报告
+├── AUDIT_FRONTEND2.md              # 前端审查报告
 ├── FIX_PLAN.md                     # 审查修复记录
 ├── LAYER_PLAN.md                   # 分层重构方案
 └── netlify/edge-functions/

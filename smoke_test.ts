@@ -1,4 +1,4 @@
-// smoke_test.ts —— 离线冒烟测试：mock Turso pipeline + Identity，跑完整请求流
+// smoke_test.ts —— 离线冒烟测试：mock Turso pipeline，跑完整请求流
 // 用法：deno run -A smoke_test.ts
 
 // ---- mock Deno.env ----

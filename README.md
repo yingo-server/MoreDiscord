@@ -11,8 +11,8 @@ Chat app: React + Vite + Tailwind frontend, Netlify Edge Functions + Turso backe
 ├── smoke_test.ts                   # offline smoke test (45 assertions)
 ├── tool/                           # lang/button tests, emoji check
 ├── frontend/                       # React + TS + Vite + Tailwind (source)
-├── AUDIT_BACKEND.md                # backend audit report
-├── AUDIT_FRONTEND.md               # frontend audit report
+├── AUDIT_BACKEND2.md               # backend audit report
+├── AUDIT_FRONTEND2.md              # frontend audit report
 ├── FIX_PLAN.md                     # audit remediation log
 ├── LAYER_PLAN.md                   # layering plan
 └── netlify/edge-functions/

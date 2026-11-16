@@ -53,7 +53,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: 冒烟测试（mock Turso/Identity，41 断言）
+      - name: 冒烟测试（mock Turso，46 断言）
         run: deno run -A smoke_test.ts
 
   live-db:

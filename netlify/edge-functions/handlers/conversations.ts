@@ -314,9 +314,9 @@ export async function deleteConversation(ctx: Ctx, id: string): Promise<Response
   const userId = ctx.userId!;
   await requireOwner(userId, id);
   await transaction("write", async (tx) => {
+    // FK 墓碑：只删成员关系，conversation + messages 行保留。
+    // 无成员后所有成员校验失败，会话不可达，无需硬删父行（messages.conversation_id 仍引用它）。
     await tx.run("DELETE FROM conversation_members WHERE conversation_id=?", [id]);
-    await tx.run("DELETE FROM conversations WHERE id=?", [id]);
-    // messages 物理行保留（规格 §16.5）
   });
   return ok({ id, deleted: true });
 }

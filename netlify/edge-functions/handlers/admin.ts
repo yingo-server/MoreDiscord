@@ -112,14 +112,19 @@ export async function adminDeleteUser(ctx: Ctx, id: string): Promise<Response> {
   if (id === adminId) throw new HttpError("INVALID_INPUT", "cannot delete self");
 
   await transaction("write", async (tx) => {
-    // 先删会话成员关系（成员表 FK 指向用户），再删会话与用户
+    // FK 墓碑策略：不硬删 users 行（messages.sender_id / audit_log.actor_id 仍引用它）。
+    // 改为清空身份字段释放唯一约束、置为不可登录的墓碑，并吊销会话、清成员关系。
     await tx.run("DELETE FROM conversation_members WHERE user_id=?", [id]);
     await tx.run("UPDATE sessions SET revoked=1 WHERE user_id=?", [id]);
+    const tombstone = `deleted-${id.slice(0, 8)}`;
+    await tx.run(
+      "UPDATE users SET username=?, email=?, display_name=NULL, password_hash='', admin=0 WHERE id=?",
+      [tombstone, `${tombstone}@deleted.invalid`, id],
+    );
     await tx.run(
       "INSERT INTO audit_log (id, actor_id, action, target_type, target_id, detail, created_at) VALUES (?,?,?,?,?,?,?)",
       [newId(), adminId, "admin.delete_user", "user", id, JSON.stringify({ username: target.username }), nowIso()],
     );
-    await tx.run("DELETE FROM users WHERE id=?", [id]);
   });
   return ok({ id, deleted: true });
 }
@@ -135,7 +140,8 @@ export async function adminListChannels(ctx: Ctx): Promise<Response> {
   const [cAt, cId] = decodeCursor(ctx.url.searchParams.get("cursor")) ?? ["9999-12-31T23:59:59.999Z", "\uffff"];
   let sql = `SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at,
     (SELECT COUNT(*) FROM conversation_members m WHERE m.conversation_id=c.id) AS member_count
-    FROM conversations c WHERE (c.created_at, c.id) < (?, ?)`;
+    FROM conversations c WHERE (c.created_at, c.id) < (?, ?)
+      AND EXISTS (SELECT 1 FROM conversation_members m WHERE m.conversation_id=c.id)`;
   const args: any[] = [cAt, cId];
   if (type) { sql += " AND c.type=?"; args.push(type); }
   sql += " ORDER BY c.created_at DESC, c.id DESC LIMIT ?";
@@ -155,8 +161,8 @@ export async function adminDeleteChannel(ctx: Ctx, id: string): Promise<Response
   const conv = await dbGet("SELECT id FROM conversations WHERE id=?", [id]);
   if (!conv) throw new HttpError("NOT_A_MEMBER", "conversation not found");
   await transaction("write", async (tx) => {
+    // FK 墓碑：只删成员关系，conversation + messages 保留供审计。
     await tx.run("DELETE FROM conversation_members WHERE conversation_id=?", [id]);
-    await tx.run("DELETE FROM conversations WHERE id=?", [id]);
     await tx.run(
       "INSERT INTO audit_log (id, actor_id, action, target_type, target_id, detail, created_at) VALUES (?,?,?,?,?,?,?)",
       [newId(), adminId, "admin.delete_channel", "channel", id, "", nowIso()],
