@@ -177,7 +177,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         run: |
           cd release-dist
-          npx --yes netlify-cli@27.19.0 deploy --site morediscord \
+          netlify deploy --site morediscord \
             --dir . --no-build --json > ../deploy.json
           cd ..
           cat deploy.json
