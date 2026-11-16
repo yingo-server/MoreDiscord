@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Shield } from "lucide-react"
 import { formatDisplayName } from "@/lib/displayName"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 export function UsersTab() {
   const [users, setUsers] = useState<User[]>([])
@@ -26,7 +28,7 @@ export function UsersTab() {
       setUsers((prev) => (opts.reset || !opts.cursor ? page.items : [...prev, ...page.items]))
       setNextCursor(page.next_cursor)
     } catch (e: unknown) {
-      setError((e as Error).message)
+      setError(errorText((e as ApiError)?.code))
     } finally {
       setLoading(false)
     }

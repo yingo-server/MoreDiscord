@@ -8,6 +8,8 @@ import * as chatApi from "@/api/chat"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 interface RoomDialogsProps {
   /** conversation targeted for delete (direct) or leave (group) */
@@ -41,7 +43,7 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
       onClose()
       navigate("/")
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("room.dialog.operationFailed"))
+      setError(errorText((err as ApiError)?.code, t("room.dialog.operationFailed")))
     } finally {
       setDeleting(false)
     }
@@ -55,7 +57,7 @@ export function RoomDialogs({ deleteTarget, renameTarget, onClose }: RoomDialogs
       await rename(renameTarget.id, name.trim())
       onClose()
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("profile.saveFailed"))
+      setError(errorText((err as ApiError)?.code, t("profile.saveFailed")))
     } finally {
       setSaving(false)
     }

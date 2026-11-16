@@ -3,6 +3,7 @@ import { matchRoute } from "./contracts/routes.ts";
 import { preflight, CORS } from "./platform/cors.ts";
 import { fail, failErr, readJson, HttpError } from "./platform/response.ts";
 import { resolveUserId } from "./platform/session.ts";
+import { get as dbGet } from "./platform/db.ts";
 import * as handlers from "./handlers/index.ts";
 import type { Ctx } from "./handlers/types.ts";
 
@@ -25,6 +26,11 @@ export default async function api(req: Request): Promise<Response> {
     if (match.route.auth) {
       userId = await resolveUserId(req);
       if (!userId) throw new HttpError("UNAUTHORIZED", "missing or invalid session token");
+      // 纵深防御：路由表标记 admin 时统一校验，handler 内无需重复
+      if (match.route.admin) {
+        const u = await dbGet("SELECT admin FROM users WHERE id=?", [userId]);
+        if (!u || Number(u.admin) !== 1) throw new HttpError("FORBIDDEN", "admin role required");
+      }
     }
 
     const ctx = await makeCtx(req, url, userId);

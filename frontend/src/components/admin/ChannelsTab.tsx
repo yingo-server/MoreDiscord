@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 interface Props {
   onRequestConfirm: (title: string, description: string, onConfirm: () => Promise<void>) => void
@@ -25,7 +27,7 @@ export function ChannelsTab({ onRequestConfirm }: Props) {
       setChannels((prev) => (cursor ? [...prev, ...page.items] : page.items))
       setNextCursor(page.next_cursor)
     } catch (e: unknown) {
-      setError((e as Error).message)
+      setError(errorText((e as ApiError)?.code))
     } finally {
       setLoading(false)
     }
@@ -116,7 +118,7 @@ function ChannelMessagesDialog({ channelId, onClose }: { channelId: string; onCl
         setMessages((prev) => (cursor ? [...prev, ...page.items] : page.items))
         setNextCursor(page.next_cursor)
       } catch (e: unknown) {
-        setError((e as Error).message)
+        setError(errorText((e as ApiError)?.code))
       } finally {
         setLoading(false)
       }

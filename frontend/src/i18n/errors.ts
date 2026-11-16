@@ -20,14 +20,15 @@ const CODE_TO_KEY: Record<string, string> = {
   ALREADY_MEMBER: "err.ALREADY_MEMBER",
   EMAIL_TAKEN: "err.EMAIL_EXISTS",
   TRANSLATION_UNAVAILABLE: "err.TRANSLATION_UNAVAILABLE",
+  INTERNAL_ERROR: "error.generic",
   NETWORK: "err.NETWORK",
   TIMEOUT: "err.TIMEOUT",
 }
 
 /** 按错误码取本地化文案；未知码回落到 err.generic */
 export function errorText(code?: string | null, fallback?: string): string {
-  if (!code) return fallback ?? t("err.generic")
+  if (!code) return fallback ?? t("error.generic")
   const key = CODE_TO_KEY[code]
-  if (!key) return fallback ?? t("err.generic")
+  if (!key) return fallback ?? t("error.generic")
   return t(key)
 }

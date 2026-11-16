@@ -106,6 +106,14 @@ Base URL：`/api/v1`（同站点相对路径）
 响应：`{ "data": { "id": "...", "display_name": "昵称" }, "error": null }`
 错误：`INVALID_INPUT`
 
+### GET /users — 公开用户搜索（需登录）
+Query：`search=<用户名前缀>`（可选）、`limit=1..50`（默认 20）
+响应：
+```json
+{ "data": { "users": [ { "id": "...", "username": "...", "display_name": "...|null", "tag": 1 } ] }, "error": null }
+```
+说明：只按用户名前缀匹配，只返回 id/username/display_name/tag，不返回邮箱或管理员状态。用于发起会话时选择目标用户。
+
 ---
 
 ## 会话
@@ -254,6 +262,11 @@ Query：`search=<用户名子串>`（可选）、`cursor=<Base64URL(username|id)
 响应：`{ "data": { "id", "username", "display_name", "admin" }, "error": null }`
 说明：不允许自我降权；操作写入 audit_log。
 错误：`INVALID_INPUT` / `USER_NOT_FOUND` / `FORBIDDEN`
+
+### DELETE /admin/users/:id — 注销用户
+响应：`{ "data": { "id": "...", "deleted": true }, "error": null }`
+说明：删除用户与其会话成员关系，吊销该用户全部 session，操作写入 audit_log。不允许删除自己。
+错误：`INVALID_INPUT`（自删）/ `USER_NOT_FOUND` / `FORBIDDEN`
 
 ### GET /admin/channels — 全站会话分页
 Query：`cursor`（可选）、`type=direct|group`（可选）、`limit`

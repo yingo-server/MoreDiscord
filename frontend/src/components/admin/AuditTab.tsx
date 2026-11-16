@@ -3,6 +3,8 @@ import { getAuditLog } from "@/api/admin"
 import type { AdminAuditEntry, AdminPage } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 export function AuditTab() {
   const [entries, setEntries] = useState<AdminAuditEntry[]>([])
@@ -16,7 +18,7 @@ export function AuditTab() {
       setEntries((prev) => (cursor ? [...prev, ...page.items] : page.items))
       setNextCursor(page.next_cursor)
     } catch (e: unknown) {
-      setError((e as Error).message)
+      setError(errorText((e as ApiError)?.code))
     } finally {
       setLoading(false)
     }

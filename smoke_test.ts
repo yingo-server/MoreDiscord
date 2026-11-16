@@ -411,6 +411,10 @@ check("会话列表 2 条", Array.isArray(rList.json?.data) && rList.json.data.l
 const directRow = rList.json.data.find((c: any) => c.type === "direct");
 check("私聊 peer=bob", directRow?.peer?.id === bobId, directRow);
 
+console.log("== user search ==");
+const rSearch = await call("GET", "/users?search=bob", { token: aliceTok2 });
+check("用户搜索 200 且含 bob", rSearch.status === 200 && rSearch.json?.data?.users?.some((u: any) => u.username === "bob"), rSearch.json);
+
 console.log("== messages ==");
 const rSend = await call("POST", `/conversations/${convId}/messages`, { token: aliceTok2, body: { content: "hello bob" } });
 check("发消息", rSend.status === 200 && rSend.json?.data?.content === "hello bob", rSend.json);

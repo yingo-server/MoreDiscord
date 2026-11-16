@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { useRoomStore } from "@/stores/useRoomStore"
-import { getAdminUsers } from "@/api/admin"
+import { searchUsers } from "@/api/user"
 import type { User } from "@/types/models"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatDisplayName } from "@/lib/displayName"
 import { t } from "@/i18n"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 interface CreateRoomProps {
   open: boolean
@@ -42,8 +44,8 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
     setSearching(true)
     debounceRef.current = setTimeout(async () => {
       try {
-        const page = await getAdminUsers(searchQuery)
-        setResults(page.items.filter((u) => u.id !== user?.id))
+        const page = await searchUsers(searchQuery)
+        setResults(page.users.filter((u) => u.id !== user?.id))
       } catch {
         setResults([])
       } finally {
@@ -82,7 +84,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
       setSelectedUser(null)
       navigate(`/chat/${conv.id}`)
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("room.create.failed"))
+      setError(errorText((err as ApiError)?.code, t("room.create.failed")))
     } finally {
       setLoading(false)
     }
@@ -107,7 +109,7 @@ export function CreateRoom({ open, onOpenChange }: CreateRoomProps) {
       setGroupSelected([])
       navigate(`/chat/${conv.id}`)
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("room.create.groupFailed"))
+      setError(errorText((err as ApiError)?.code, t("room.create.groupFailed")))
     } finally {
       setLoading(false)
     }

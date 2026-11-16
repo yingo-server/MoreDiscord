@@ -23,6 +23,7 @@ export const ROUTES: RouteDef[] = [
   // 用户
   { method: "PATCH", pattern: "/user/username", auth: true, handler: "updateUsername" },
   { method: "PATCH", pattern: "/user/profile", auth: true, handler: "updateProfile" },
+  { method: "GET", pattern: "/users", auth: true, handler: "searchUsers" },
   // 会话
   { method: "GET", pattern: "/conversations", auth: true, handler: "listConversations" },
   { method: "POST", pattern: "/conversations/direct", auth: true, handler: "createDirect" },

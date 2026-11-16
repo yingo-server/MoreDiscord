@@ -12,8 +12,8 @@ interface RoomState {
   fetchRooms: () => Promise<void>
   fetchDetail: (id: string) => Promise<void>
   setCurrentRoom: (id: string | null) => void
-  createDirect: (targetUserId: string) => Promise<Conversation>
-  createGroup: (name: string, memberIds: string[]) => Promise<Conversation>
+  createDirect: (targetUserId: string) => Promise<{ id: string }>
+  createGroup: (name: string, memberIds: string[]) => Promise<{ id: string }>
   rename: (id: string, name: string) => Promise<void>
   removeRoom: (id: string) => void
   clearUnread: (id: string) => void

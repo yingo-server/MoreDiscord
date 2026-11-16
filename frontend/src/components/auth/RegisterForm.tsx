@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { errorText } from "@/i18n/errors"
+import { ApiError } from "@/api/client"
 
 export function RegisterForm() {
   const navigate = useNavigate()
@@ -39,7 +41,7 @@ export function RegisterForm() {
         navigate("/", { replace: true })
       }
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("auth.register.failed"))
+      setError(errorText((err as ApiError)?.code, t("auth.register.failed")))
     } finally {
       setLoading(false)
     }
@@ -60,7 +62,7 @@ export function RegisterForm() {
       setSession(res.session_token, res.user)
       navigate("/", { replace: true })
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("auth.register.verifyFailed"))
+      setError(errorText((err as ApiError)?.code, t("auth.register.verifyFailed")))
       setVerifying(false)
     }
   }
@@ -75,7 +77,7 @@ export function RegisterForm() {
       await authApi.recover(confirmEmail)
       setInfo(t("auth.register.resendSent"))
     } catch (err: unknown) {
-      setError((err as Error)?.message || t("auth.register.resendFailed"))
+      setError(errorText((err as ApiError)?.code, t("auth.register.resendFailed")))
     } finally {
       setResending(false)
     }

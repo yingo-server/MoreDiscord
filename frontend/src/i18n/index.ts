@@ -165,6 +165,7 @@ const EN: Record<string, string> = {
   "admin.ch.msgTitle": "Channel Messages",
   "admin.ch.noMsgs": "No messages",
   "admin.users.search": "Search users...",
+  "admin.users.deleteConfirm": "Delete {name}?",
   "admin.users.username": "Username",
   "admin.users.display": "Display name",
   "admin.users.email": "Email",

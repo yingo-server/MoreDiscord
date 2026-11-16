@@ -12,6 +12,11 @@ import sys
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else "."
 SKIP_DIRS = {"node_modules", ".git", "dist", ".next", "build"}
+# 审查报告/任务书是历史记录，不属于产品代码，其中的对勾不算 UI emoji
+SKIP_FILES = {"AUDIT_BACKEND.md", "AUDIT_FRONTEND.md", "AUDIT_BACKEND2.md",
+              "AUDIT_FRONTEND2.md", "AUDIT_CONTRACT.md", "FIX_PLAN.md",
+              "LAYER_PLAN.md", "FULLCHECK_TASK.md", "PASSWORDLESS_TASK.md",
+              "TRANSLATE_TASK.md"}
 EXTS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".md", ".sql", ".yml", ".yaml",
         ".json", ".html", ".css", ".txt", ".toml")
 
@@ -31,7 +36,7 @@ def main() -> int:
     for root, dirs, files in os.walk(ROOT):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for name in files:
-            if not name.endswith(EXTS):
+            if not name.endswith(EXTS) or name in SKIP_FILES:
                 continue
             path = os.path.join(root, name)
             try:

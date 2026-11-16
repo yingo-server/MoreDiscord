@@ -55,7 +55,7 @@ export async function signup(ctx: Ctx): Promise<Response> {
   return ok({
     session_token: sessionToken,
     confirmation_required: needVerify,
-    user: { id: userId, username, email },
+    user: { id: userId, username, email, admin: 0 },
   });
 }
 
@@ -70,7 +70,7 @@ export async function login(ctx: Ctx): Promise<Response> {
   const email = requireEmail(ctx.body).toLowerCase();
   const password = requireString(ctx.body, "password");
 
-  const row = await dbGet("SELECT id, username, email, password_hash FROM users WHERE email=?", [email]);
+  const row = await dbGet("SELECT id, username, email, password_hash, admin FROM users WHERE email=?", [email]);
   // 用户不存在与密码错误返回同一错误，避免账号枚举
   if (!row) throw new HttpError("INVALID_CREDENTIALS", "invalid email or password");
   if (!(await verifyPassword(password, row.password_hash as string))) {
@@ -80,7 +80,7 @@ export async function login(ctx: Ctx): Promise<Response> {
   const sessionToken = await createSession(row.id as string);
   return ok({
     session_token: sessionToken,
-    user: { id: row.id, username: row.username, email: row.email },
+    user: { id: row.id, username: row.username, email: row.email, admin: Number(row.admin) === 1 ? 1 : 0 },
   });
 }
 
@@ -100,7 +100,7 @@ export async function recover(ctx: Ctx): Promise<Response> {
 export async function me(ctx: Ctx): Promise<Response> {
   const userId = await resolveUserId(ctx.req);
   if (!userId) throw new HttpError("UNAUTHORIZED", "missing or invalid session token");
-  const row = await dbGet("SELECT id, username, display_name, email, created_at FROM users WHERE id=?", [userId]);
+  const row = await dbGet("SELECT id, username, display_name, email, admin, created_at FROM users WHERE id=?", [userId]);
   if (!row) throw new HttpError("UNAUTHORIZED", "user not found");
   const { getTag } = await import("../domain/tags.ts");
   const tag = await getTag(dbGet, row as any);

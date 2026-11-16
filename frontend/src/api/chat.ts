@@ -14,11 +14,11 @@ export async function getConversation(id: string): Promise<ConversationDetail> {
   return api.get<ConversationDetail>(`/conversations/${id}`)
 }
 
-export async function createDirect(targetUserId: string): Promise<Conversation> {
+export async function createDirect(targetUserId: string): Promise<{ id: string }> {
   return api.post<Conversation>("/conversations/direct", { targetUserId })
 }
 
-export async function createGroup(name: string, memberIds: string[]): Promise<Conversation> {
+export async function createGroup(name: string, memberIds: string[]): Promise<{ id: string }> {
   return api.post<Conversation>("/conversations/group", { name, memberIds })
 }
 

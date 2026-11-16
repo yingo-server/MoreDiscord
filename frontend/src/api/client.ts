@@ -14,23 +14,18 @@ export class ApiError extends Error {
   }
 }
 
-let token: string | null = null
-try {
-  const raw = localStorage.getItem(AUTH_KEY)
-  if (raw) {
-    const parsed = JSON.parse(raw)
-    token = parsed?.state?.sessionToken ?? null
-  }
-} catch {
-  token = null
-}
-
+// token 与 zustand persist 共用 yingo_auth 结构；每次请求实时读取，避免内存快照过期。
 export function getToken(): string | null {
-  return token
+  try {
+    const raw = localStorage.getItem(AUTH_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)?.state?.sessionToken ?? null
+  } catch {
+    return null
+  }
 }
 
 export function setToken(tk: string | null): void {
-  token = tk
   try {
     if (tk) {
       const raw = localStorage.getItem(AUTH_KEY)
@@ -72,11 +67,12 @@ class ApiClient {
     const timer = setTimeout(() => controller.abort(), 10000)
     let res: Response
     try {
+      const currentToken = getToken()
       res = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
         },
         body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
         signal: controller.signal,
@@ -99,7 +95,7 @@ class ApiClient {
     const code = envelope?.error?.code ?? ""
     if (!res.ok || envelope?.error) {
       // 会话过期：清理本地凭证并回到登录
-      if (res.status === 401 && code === "UNAUTHORIZED" && token) {
+      if (res.status === 401 && code === "UNAUTHORIZED" && getToken()) {
         setToken(null)
         const p = window.location.pathname
         if (p !== "/login" && p !== "/register") {
