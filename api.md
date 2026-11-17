@@ -4,7 +4,7 @@ Base URL：`/api/v1`（同站点相对路径）
 认证：`Authorization: Bearer sess_xxx`（除标注「无需认证」外全部必需）。账号由 Turso 自管，密码 PBKDF2-SHA256 哈希，邮箱验证功能当前冻结。
 统一响应：成功 `{"data": ..., "error": null}`；失败 `{"data": null, "error": {"code": "...", "message": "..."}}`
 
-## 错误码总表
+##  错误码总表
 
 | code | HTTP | 含义 |
 |---|---|---|
