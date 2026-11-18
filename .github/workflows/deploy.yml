@@ -176,12 +176,13 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         run: |
-          # 复制到一个不在 git 仓库内的干净目录，避免 CLI 探测 git remote
+          # 干净目录：静态产物在根 + edge functions 在 netlify/ 子目录
           DEPLOY_DIR="$RUNNER_TEMP/netlify-deploy"
-          mkdir -p "$DEPLOY_DIR"
+          mkdir -p "$DEPLOY_DIR/netlify/edge-functions"
           cp -r release-dist/. "$DEPLOY_DIR/"
+          cp -r netlify/edge-functions/. "$DEPLOY_DIR/netlify/edge-functions/"
           cd "$DEPLOY_DIR"
-          netlify deploy --site morediscord \
+          netlify deploy --site morediscord --prod \
             --dir . --no-build --json 2>&1 | tee "$GITHUB_WORKSPACE/deploy.json"
           cd "$GITHUB_WORKSPACE"
           test -s deploy.json
